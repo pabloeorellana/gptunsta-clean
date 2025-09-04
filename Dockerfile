@@ -1,15 +1,15 @@
+# Paso 1: Usar una imagen oficial de Nginx, ligera y optimizada
 FROM nginx:stable-alpine
 
 # Paso 2: Copiar los archivos del frontend ya construidos
-# Copia el contenido de tu carpeta 'dist' local a la carpeta
-# donde Nginx sirve los archivos por defecto dentro del contenedor.
 COPY dist/ /usr/share/nginx/html
 
-# Paso 3: Exponer el puerto
-# Informa a Docker que el contenedor escuchará en el puerto 80
+# Paso 3: Copiar nuestro archivo de configuración personalizado
+# Esto reemplazará la configuración por defecto de Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Paso 4: Exponer el puerto
 EXPOSE 80
 
-# Paso 4: Comando de inicio
-# La imagen de Nginx se inicia automáticamente, pero es una buena práctica
-# incluir el comando
+# Paso 5: Comando de inicio
 CMD ["nginx", "-g", "daemon off;"]
