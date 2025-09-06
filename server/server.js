@@ -63,8 +63,20 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware para servir archivos estáticos de la carpeta 'uploads'
+/*
+// --- CÓDIGO ANTIGUO (COMENTADO PARA ANÁLISIS) ---
+// Esta línea usaba una ruta relativa (path.join(__dirname, 'uploads')).
+// __dirname apunta a /app/server, por lo que la ruta final era /app/server/uploads.
+// Queremos que apunte a la raíz /app/uploads para que coincida con el Volume Mount.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+*/
+
+// --- CÓDIGO NUEVO Y MEJORADO ---
+// Usamos una ruta ABSOLUTA para servir los archivos estáticos.
+// Esto asegura que Express sirva los archivos desde la misma carpeta
+// que hemos hecho persistente con el Volume Mount (/app/uploads).
+app.use('/uploads', express.static('/app/uploads'));
+
 
 // --- Montaje de Rutas de la API con Prefijos ---
 // Todas las rutas de tu API deben estar activas para que el backend funcione.
@@ -89,7 +101,7 @@ app.get('/api/health', (req, res) => {
 /*
 // --- SERVIR EL FRONTEND EN PRODUCCIÓN ---
 // Este bloque se comenta porque en el enfoque dividido, 
-// el frontend será servido por una app de Dokku separada.
+// el frontend será servido por una app de Coolify separada.
 if (process.env.NODE_ENV === 'production') {
     // 1. Sirve la carpeta 'dist' que contiene tu frontend construido
     const buildPath = path.join(__dirname, '../dist');
@@ -122,5 +134,5 @@ app.use((err, req, res, next) => {
 
 // Iniciar el servidor
 app.listen(PORT, () => {
-    console.log(`Servidor backend NutriSmart corriendo en el puerto: ${PORT}`);
+    console.log(`Servidor backend GPTUNSTA corriendo en el puerto: ${PORT}`);
 });
