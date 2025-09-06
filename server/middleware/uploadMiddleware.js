@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
         //    La opción { recursive: true } es clave: creará 'uploads' y luego 'avatars'.
         fs.mkdirSync(uploadPath, { recursive: true });
 
-        // 3. Pasamos la ruta absoluta al callback de multer.
+        // 3. Pasamos la ruta absoluta al callbacks de multer.
         cb(null, uploadPath);
     },
     filename(req, file, cb) {

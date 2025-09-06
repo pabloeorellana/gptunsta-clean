@@ -78,7 +78,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/uploads', express.static('/app/uploads'));
 
 
-// --- Montaje de Rutas de la API con Prefijos ---
+// --- Montaje de Rutas de la API con Prefijos ----
 // Todas las rutas de tu API deben estar activas para que el backend funcione.
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
