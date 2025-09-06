@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
+import { es } from 'date-fns/locale';
 
 export const getAppointments = async (req, res) => {
     const { userId, role } = req.user;
