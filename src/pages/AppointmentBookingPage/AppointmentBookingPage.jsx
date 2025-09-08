@@ -137,7 +137,6 @@ const AppointmentBookingPage = () => {
         setSelectedProfessionalId(profId);
         setSelectedProfessionalName(profName);
         setCurrentStep(STEPS.CALENDAR_SELECTION);
-        navigate(`/reservar-turno/${profId}`);
     };
 
     const handleSlotSelected = (dateTime) => {
@@ -186,7 +185,6 @@ const AppointmentBookingPage = () => {
             setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
             setSelectedProfessionalId(null);
             setSelectedProfessionalName('');
-            navigate('/reservar-turno');
         } else if (currentStep === STEPS.PATIENT_FORM) {
             setCurrentStep(STEPS.CALENDAR_SELECTION);
         }
@@ -205,7 +203,6 @@ const AppointmentBookingPage = () => {
         setDniLookupPerformed(false);
         setSubmissionError('');
         setIsSubmitting(false);
-        navigate('/reservar-turno');
     };
 
     const renderProfessionalSelection = () => {
