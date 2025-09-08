@@ -304,7 +304,7 @@ const AppointmentBookingPage = () => {
                         <Typography variant="h6" component="div" gutterBottom>ATENCIÓN:</Typography>
                         <Typography variant="body2">El turno solicitado es un compromiso.</Typography>
                         <Typography variant="body2" sx={{ mt: 1 }}>
-                            Si no asistirá al turno solicitado, rogamos que cancele el mismo para liberar el horario y
+                            Si no asistirá al turno solicitado, rogamos comuncarse y cancelar el mismo para liberar el horario y
                             pueda ser usado por otro paciente. Agradecemos su compromiso y comprensión.
                         </Typography>
                     </Alert>
