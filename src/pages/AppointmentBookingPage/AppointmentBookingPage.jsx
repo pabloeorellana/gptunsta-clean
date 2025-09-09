@@ -153,7 +153,7 @@ const AppointmentBookingPage = () => {
             // los campos que el backend espera (firstName, lastName) en lugar de fullName.
             const payload = {
                 professionalUserId: selectedProfessionalId,
-                dateTime: format(appointmentDateTime, 'yyyy-MM-dd HH:mm:ss'),
+                dateTime: appointmentDateTime.toISOString(),
                 dni: patientDetails.dni,
                 firstName: patientDetails.firstName,
                 lastName: patientDetails.lastName,

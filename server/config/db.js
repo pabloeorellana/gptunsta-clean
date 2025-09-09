@@ -2,23 +2,34 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Mantenemos la lógica de detección para logging, está perfecta.
 if (process.env.DATABASE_URL) {
     console.log("DATABASE_URL encontrada. Usando para la conexión.");
 } else {
     console.log("DATABASE_URL no encontrada. Usando DB_HOST, DB_USER, etc.");
 }
 
+// --- CÓDIGO CORREGIDO Y FINAL ---
+// 1. Definimos las opciones base que son comunes a ambos entornos.
+const baseOptions = {
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    // La clave: le decimos a mysql2 que trabaje siempre en UTC.
+    timezone: 'Z' 
+};
+
+// 2. Creamos el objeto de configuración final fusionando las opciones.
 const connectionOptions = process.env.DATABASE_URL
-    ? { uri: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    // Para producción, fusionamos las opciones base con la URI.
+    ? { ...baseOptions, uri: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    // Para local, fusionamos las opciones base con los detalles de host, usuario, etc.
     : {
+        ...baseOptions,
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        timezone: '+00:00'
       };
 
 let pool;
