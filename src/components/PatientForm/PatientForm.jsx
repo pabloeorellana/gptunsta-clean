@@ -8,7 +8,7 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
         firstName: '',
         email: '',
         phone: '',
-        motivo: '',
+        reasonForVisit: '',
     });
     const [errors, setErrors] = useState({});
 
@@ -118,9 +118,9 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
                     </Grid>
                     <Grid item>
                         <TextField
-                            name="motivo" label="Motivo de la consulta (Opcional)"
+                            name="reasonForVisit" label="Motivo de la consulta (Opcional)"
                             multiline rows={3} fullWidth
-                            value={patientDetails.motivo || ''} onChange={handleChange}
+                            value={patientDetails.reasonForVisit || ''} onChange={handleChange}
                         />
                     </Grid>
                     <Grid item container spacing={2} sx={{ mt: 1 }}>

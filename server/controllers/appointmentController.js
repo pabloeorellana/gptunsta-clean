@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale/es';
+import { formatInTimeZone } from 'date-fns-tz';
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
 
@@ -226,7 +227,7 @@ export const createPublicAppointment = async (req, res) => {
             );
          }
 
-         const notificationMessage = `Nuevo turno de ${fullName} para el ${format(new Date(dateTime), 'dd/MM \'a las\' HH:mm', { locale: es })}.`;
+         const notificationMessage = `Nuevo turno de ${fullName} para el ${formatInTimeZone(new Date(dateTime), 'America/Argentina/Buenos_Aires', 'dd/MM \'a las\' HH:mm', { locale: es })}.`;
          const notificationLink = `/profesional/dashboard/agenda?appointmentId=${appointmentId}`;
          await connection.query(
              'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',
