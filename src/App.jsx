@@ -5,9 +5,12 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Typography from '@mui/material/Typography';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
+
+// --- (AÑADIDO) Importamos la nueva Landing Page ---
+import LandingPage from './pages/LandingPage/LandingPage.jsx';
+
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage/ResetPasswordPage.jsx';
-
 import AppointmentBookingPage from './pages/AppointmentBookingPage/AppointmentBookingPage.jsx';
 import ProfessionalLoginPage from './pages/ProfessionalLoginPage/ProfessionalLoginPage.jsx';
 import ProfessionalDashboardLayout from './pages/ProfessionalDashboardPage/ProfessionalDashboardLayout.jsx';
@@ -60,9 +63,16 @@ function App() {
                 <NotificationProvider>
                     <AuthProvider>
                         <Routes>
+                            {/* --- Ruta Principal --- */}
+                            {/* Ahora la ruta raíz '/' muestra la nueva LandingPage. */}
+                            <Route path="/" element={<LandingPage />} />
+
                             {/* --- Rutas Públicas para Pacientes --- */}
-                            <Route path="/" element={<AppointmentBookingPage />} />
-                            <Route path="/reservar/:professionalId" element={<AppointmentBookingPage />} />
+                            {/* La ruta para reservar turnos ahora es explícitamente '/reservar-turno'. */}
+                            <Route path="/reservar-turno" element={<AppointmentBookingPage />} />
+                            <Route path="/reservar-turno/:professionalId" element={<AppointmentBookingPage />} />
+                            
+                            {/* --- Rutas de Autenticación y Recuperación --- */}
                             <Route path="/profesional/login" element={<ProfessionalLoginPage />} />                
                             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />

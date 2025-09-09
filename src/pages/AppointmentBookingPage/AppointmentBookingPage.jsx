@@ -144,21 +144,34 @@ const AppointmentBookingPage = () => {
         setCurrentStep(STEPS.PATIENT_FORM);
     };
 
-    const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
-        setIsSubmitting(true);
-        setSubmissionError('');
-        try {
-            const payload = {
-                professionalUserId: selectedProfessionalId,
-                dateTime: appointmentDateTime.toISOString(),
-                patientDetails: patientDetails
-            };
+const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
+    setIsSubmitting(true);
+    setSubmissionError('');
+    try {
+        /*
+        // --- CÓDIGO ANTIGUO (COMENTADO) ---
+        const payload = {
+            professionalId: selectedProfessionalId,
+            dateTime: appointmentDateTime.toISOString(),
+            patientDetails: patientDetails 
+        };
+        */
 
-            const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+        // --- CÓDIGO CORREGIDO Y FINAL ---
+        // Usamos el "spread operator" (...) para tomar todas las propiedades
+        // del objeto 'patientDetails' (como dni, fullName, etc.) y ponerlas
+        // directamente en el nivel superior de nuestro 'payload'.
+        const payload = {
+            professionalUserId: selectedProfessionalId, // Renombrado para consistencia con la DB
+            dateTime: appointmentDateTime.toISOString(),
+            ...patientDetails 
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
 
             const data = await response.json();
             if (!response.ok) {
