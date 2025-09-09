@@ -85,7 +85,6 @@ const AppointmentBookingPage = () => {
     }, [paramProfessionalId]);
 
     useEffect(() => {
-        // Solo mostramos el modal de bienvenida si no viene un ID de profesional en la URL
         if (!paramProfessionalId) {
             setWelcomeModalOpen(true);
         } else {
@@ -144,34 +143,42 @@ const AppointmentBookingPage = () => {
         setCurrentStep(STEPS.PATIENT_FORM);
     };
 
-const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
-    setIsSubmitting(true);
-    setSubmissionError('');
-    try {
-        /*
-        // --- CÓDIGO ANTIGUO (COMENTADO) ---
-        const payload = {
-            professionalId: selectedProfessionalId,
-            dateTime: appointmentDateTime.toISOString(),
-            patientDetails: patientDetails 
-        };
-        */
+    const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
+        setIsSubmitting(true);
+        setSubmissionError('');
+        try {
+            /*
+            // --- CÓDIGO ANTIGUO (COMENTADO PARA ANÁLISIS) ---
+            // El uso del spread operator (...) a veces puede ser ambiguo o fallar
+            // si el objeto `patientDetails` no tiene exactamente la estructura esperada.
+            const payload_anterior = {
+                professionalUserId: selectedProfessionalId,
+                dateTime: appointmentDateTime.toISOString(),
+                ...patientDetails 
+            };
+            */
 
-        // --- CÓDIGO CORREGIDO Y FINAL ---
-        // Usamos el "spread operator" (...) para tomar todas las propiedades
-        // del objeto 'patientDetails' (como dni, fullName, etc.) y ponerlas
-        // directamente en el nivel superior de nuestro 'payload'.
-        const payload = {
-            professionalUserId: selectedProfessionalId, // Renombrado para consistencia con la DB
-            dateTime: appointmentDateTime.toISOString(),
-            ...patientDetails 
-        };
+            // --- CÓDIGO NUEVO Y A PRUEBA DE FALLOS ---
+            // Construimos el payload de forma explícita, campo por campo.
+            // Esto asegura que siempre enviemos la estructura que el backend espera,
+            // evitando errores de "datos requeridos faltantes".
+            const payload = {
+                professionalUserId: selectedProfessionalId,
+                dateTime: appointmentDateTime.toISOString(),
+                dni: patientDetails.dni,
+                fullName: `${patientDetails.firstName} ${patientDetails.lastName}`, // Aseguramos que fullName se construya
+                firstName: patientDetails.firstName,
+                lastName: patientDetails.lastName,
+                email: patientDetails.email,
+                phone: patientDetails.phone,
+                reasonForVisit: patientDetails.reasonForVisit
+            };
 
-        const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+            const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
 
             const data = await response.json();
             if (!response.ok) {
