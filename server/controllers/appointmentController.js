@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale/es';
+import { es } from 'date-fns/locale/es'; // Se mantiene esta importación, es la correcta
 import { formatInTimeZone } from 'date-fns-tz';
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
+// La importación duplicada de 'es' ha sido eliminada.
 
 export const getAppointments = async (req, res) => {
     const { userId, role } = req.user;
@@ -54,7 +55,7 @@ export const createManualAppointment = async (req, res) => {
         return res.status(400).json({ message: 'Se requiere paciente y fecha/hora.' });
     }
     try {
-        const appointmentId = `appt_${uuidv4()}`; // Usando uuidv4 para IDs únicos
+        const appointmentId = `appt_${uuidv4()}`;
 
         await pool.query(
             'INSERT INTO Appointments (id, dateTime, patientId, professionalUserId, reasonForVisit, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -62,7 +63,10 @@ export const createManualAppointment = async (req, res) => {
         );
         const [patientData] = await pool.query('SELECT fullName FROM Patients WHERE id = ?', [patientId]);
         const patientName = patientData.length > 0 ? patientData[0].fullName : 'Paciente';
-        const notificationMessage = `Turno manual añadido para ${patientName} el ${format(new Date(dateTime), "dd/MM 'a las' HH:mm", { locale: es })}.`;
+        
+        // Usamos formatInTimeZone para mostrar la hora correcta en la notificación
+        const notificationMessage = `Turno manual añadido para ${patientName} el ${formatInTimeZone(new Date(dateTime), 'America/Argentina/Buenos_Aires', "dd/MM 'a las' HH:mm", { locale: es })}.`;
+        
         await pool.query(
             'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',
             [professionalUserId, notificationMessage, `/profesional/dashboard/agenda?appointmentId=${appointmentId}`]
@@ -179,8 +183,6 @@ export const updateProfessionalNotes = async (req, res) => {
 };
 
 export const createPublicAppointment = async (req, res) => {
-    // --- CÓDIGO CORREGIDO ---
-    // Aceptamos firstName y lastName, y construimos fullName.
     const { professionalUserId, dateTime, dni, firstName, lastName, email, phone, reasonForVisit } = req.body;
     const fullName = `${firstName || ''} ${lastName || ''}`.trim();
 
