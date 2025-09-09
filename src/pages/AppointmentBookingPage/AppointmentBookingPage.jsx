@@ -148,7 +148,7 @@ const AppointmentBookingPage = () => {
         setIsSubmitting(true);
         setSubmissionError('');
         try {
-            // --- CÓDIGO CORREGIDO Y FINAL ---
+            // --- CÓDIGO CORREGIDOS Y FINAL ---
             // Construimos el payload de forma explícita, asegurándonos de enviar
             // los campos que el backend espera (firstName, lastName) en lugar de fullName.
             const payload = {

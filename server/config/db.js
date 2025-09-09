@@ -15,7 +15,7 @@ const baseOptions = {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    // La clave: le decimos a mysql2 que trabaje siempre en UTC.
+    // La clave: le decimos a mysql2 que trabaje siempre en UTC. Horario
     timezone: 'Z' 
 };
 

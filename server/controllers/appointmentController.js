@@ -213,7 +213,6 @@ export const createPublicAppointment = async (req, res) => {
              'INSERT INTO Appointments (id, professionalUserId, dateTime, patientId, reasonForVisit) VALUES (?, ?, ?, ?, ?)',
              [appointmentId, professionalUserId, dateTime, patientId, reasonForVisit || null]
          );
-
          const [professionalData] = await connection.query('SELECT fullName, email FROM Users WHERE id = ?', [professionalUserId]);
 
          if (professionalData.length > 0) {
