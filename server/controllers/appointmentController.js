@@ -178,80 +178,70 @@ export const updateProfessionalNotes = async (req, res) => {
 };
 
 export const createPublicAppointment = async (req, res) => {
-    const { professionalId, dateTime, patientDetails } = req.body;
-    const { dni, firstName, lastName, email, phone, birthDate, motivo } = patientDetails;
-    const reasonForVisit = motivo;
-    if (!professionalId || !dateTime || !dni || !firstName || !lastName || !email) {
-        return res.status(400).json({ message: 'Faltan datos requeridos para la reserva.' });
-    }
-    let connection;
-    try {
-        connection = await pool.getConnection();
-        await connection.beginTransaction();
+     // --- CÓDIGO CORREGIDO ---
+     // Desestructuramos los datos del paciente directamente desde req.body,
+     // en lugar de buscar un objeto 'patientDetails'.
+     const { professionalUserId, dateTime, dni, fullName, email, phone, reasonForVisit } = req.body;
 
-        const dateObject = new Date(dateTime); 
+     if (!professionalUserId || !dateTime || !dni || !fullName || !email) {
+         return res.status(400).json({ message: 'Faltan datos requeridos para la reserva.' });
+     }
 
-        const [existingAppointments] = await connection.query(
-            'SELECT id FROM Appointments WHERE professionalUserId = ? AND dateTime = ? AND status NOT LIKE ? FOR UPDATE',
-            [professionalId, dateObject, 'CANCELED%']
-        );
-        if (existingAppointments.length > 0) {
-            await connection.rollback();
-            return res.status(409).json({ message: 'Lo sentimos, este horario ya no está disponible. Por favor, seleccione otro.' });
-        }
-        let patientId;
-        const [existingPatientsRows] = await connection.query('SELECT id FROM Patients WHERE dni = ?', [dni]);
-        if (existingPatientsRows.length > 0) {
-            patientId = existingPatientsRows[0].id;
-            const finalBirthDate = birthDate ? new Date(birthDate) : null;
-            await connection.query(
-                'UPDATE Patients SET firstName = ?, lastName = ?, fullName = ?, email = ?, phone = ?, birthDate = ?, updatedAt = NOW() WHERE id = ?',
-                [firstName, lastName, `${firstName} ${lastName}`, email, phone || null, finalBirthDate, patientId]
-            );
-        } else {
-            const fullName = `${firstName} ${lastName}`;
-            const finalBirthDate = birthDate ? new Date(birthDate) : null;
-            const [newPatientResult] = await connection.query(
-                'INSERT INTO Patients (dni, fullName, firstName, lastName, email, phone, birthDate, createdByProfessionalId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [dni, fullName, firstName, lastName, email, phone || null, finalBirthDate, professionalId]
-            );
-            patientId = newPatientResult.insertId;
-        }
-        const appointmentId = `appt_${uuidv4()}`;
-        await connection.query(
-            'INSERT INTO Appointments (id, dateTime, patientId, professionalUserId, reasonForVisit, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [appointmentId, dateObject, patientId, professionalId, reasonForVisit || null, 'SCHEDULED']
-        );
-        const [professionalUserRows] = await connection.query('SELECT fullName FROM Users WHERE id = ?', [professionalId]);
-        const professionalName = professionalUserRows.length > 0 ? professionalUserRows[0].fullName : 'Profesional';
-        const timeZone = 'America/Argentina/Buenos_Aires';
-        const formattedNotificationTime = formatInTimeZone(new Date(dateTime), timeZone, "dd/MM 'a las' HH:mm", { locale: es });
-        const notificationMessage = `Nuevo turno de ${firstName} ${lastName} para el ${format(new Date(dateTime), "dd/MM 'a las' HH:mm")}.`;
-        await connection.query(
-            'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',
-            [professionalId, notificationMessage, `/profesional/dashboard/agenda?appointmentId=${appointmentId}`]
-        );
-        await connection.commit();
-        await sendAppointmentConfirmationEmail(
-            email,
-            `${firstName} ${lastName}`,
-            professionalName,
-            dateTime,
-            reasonForVisit
-        );
-        res.status(201).json({
-            message: '¡Turno confirmado exitosamente!',
-            appointment: {
-                id: appointmentId,
-                dateTime: dateObject.toISOString(),
-                patientId: patientId,
-            }
-        });
-    } catch (error) {
-        if (connection) await connection.rollback();
-        console.error('Error en createPublicAppointment:', error);
-        res.status(500).json({ message: 'Error del servidor al procesar la reserva.' });
-    } finally {
-        if (connection) connection.release();
-    }
-};
+     const connection = await pool.getConnection();
+     try {
+         await connection.beginTransaction();
+
+         // Paso 1: Buscar o crear el paciente
+         let [patients] = await connection.query('SELECT id FROM Patients WHERE dni = ?', [dni]);
+         let patientId;
+
+         if (patients.length > 0) {
+             // El paciente ya existe, usamos su ID
+             patientId = patients[0].id;
+             // Opcional: Actualizar sus datos de contacto
+             await connection.query(
+                 'UPDATE Patients SET fullName = ?, email = ?, phone = ? WHERE id = ?',
+                 [fullName, email, phone || null, patientId]
+             );
+         } else {
+             // El paciente es nuevo, lo creamos
+             const [result] = await connection.query(
+                 'INSERT INTO Patients (dni, fullName, email, phone) VALUES (?, ?, ?, ?)',
+                 [dni, fullName, email, phone || null]
+             );
+             patientId = result.insertId;
+         }
+
+         // Paso 2: Crear el turno
+         const appointmentId = `appt_${uuidv4()}`;
+         await connection.query(
+             'INSERT INTO Appointments (id, professionalUserId, dateTime, patientId, reasonForVisit) VALUES (?, ?, ?, ?, ?)',
+             [appointmentId, professionalUserId, dateTime, patientId, reasonForVisit || null]
+         );
+
+         // (Opcional) Paso 3: Crear una notificación para el profesional
+         const notificationMessage = `Nuevo turno de ${fullName} para el ${format(new Date(dateTime), 'dd/MM \'a las\' HH:mm', { locale: es })}.`;
+         const notificationLink = `/profesional/dashboard/agenda?appointmentId=${appointmentId}`;
+         await connection.query(
+             'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',
+             [professionalUserId, notificationMessage, notificationLink]
+         );
+
+         await connection.commit();
+
+         res.status(201).json({
+             message: 'Turno confirmado exitosamente.',
+             appointmentId: appointmentId
+         });
+
+     } catch (error) {
+         await connection.rollback();
+         console.error("Error en createPublicAppointment:", error);
+         if (error.code === 'ER_DUP_ENTRY') {
+             return res.status(409).json({ message: 'El horario seleccionado ya no está disponible. Por favor, elija otro.' });
+         }
+         res.status(500).json({ message: 'Error interno del servidor al confirmar el turno.' });
+     } finally {
+         connection.release();
+     }
+ };
