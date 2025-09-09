@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Container, Typography, Box, CssBaseline, AppBar, Toolbar, Alert, TextField,
-    Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions
+    Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions,
+    Card, CardContent, CardActions, Avatar
 } from '@mui/material';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config';
 import AvailabilityCalendar from '../../components/AvailabilityCalendar/AvailabilityCalendar.jsx';
 import PatientForm from '../../components/PatientForm/PatientForm.jsx';
 import AppointmentConfirmation from '../../components/AppointmentConfirmation/AppointmentConfirmation.jsx';
 import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
 import SearchIcon from '@mui/icons-material/Search';
-import ProfessionalSelectionStep from '../../components/ProfessionalSelectionStep/ProfessionalSelectionStep.jsx';
+
+const getInitials = (name) => {
+    if (!name) return '?';
+    const nameParts = name.trim().split(' ');
+    if (nameParts.length > 1 && nameParts[0] && nameParts[nameParts.length - 1]) {
+        return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+    }
+    if (nameParts[0]) {
+         return name.substring(0, 2).toUpperCase();
+    }
+    return '?';
+};
 
 const STEPS = {
     WELCOME_DNI: 0,
@@ -22,49 +34,65 @@ const STEPS = {
 
 const AppointmentBookingPage = () => {
     const { professionalId: paramProfessionalId } = useParams();
+    const navigate = useNavigate();
 
-    // Estados para controlar el flujo
     const [currentStep, setCurrentStep] = useState(STEPS.PROFESSIONAL_SELECTION);
     const [welcomeModalOpen, setWelcomeModalOpen] = useState(true);
-
-    // Estados para los datos del flujo
+    const [professionals, setProfessionals] = useState([]);
+    const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+    const [errorProfessionals, setErrorProfessionals] = useState('');
     const [selectedProfessionalId, setSelectedProfessionalId] = useState(null);
     const [selectedProfessionalName, setSelectedProfessionalName] = useState('');
     const [selectedDateTime, setSelectedDateTime] = useState(null);
     const [confirmedAppointment, setConfirmedAppointment] = useState(null);
-
-    // Estados para el DNI lookup
     const [dniInput, setDniInput] = useState('');
     const [recognizedPatient, setRecognizedPatient] = useState(null);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
     const [dniLookupPerformed, setDniLookupPerformed] = useState(false);
-
-    // Estados de envío del formulario
     const [submissionError, setSubmissionError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
-        if (paramProfessionalId) {
-            setSelectedProfessionalId(paramProfessionalId);
-            setCurrentStep(STEPS.CALENDAR_SELECTION);
-            const fetchProfessionalName = async () => {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/public/professionals`);
-                    const data = await response.json();
-                    const prof = data.find(p => p.id === paramProfessionalId);
-                    if (prof) {
-                        setSelectedProfessionalName(prof.fullName);
-                    }
-                } catch (err) {
-                    console.error("Error fetching professional name:", err);
+    const fetchProfessionals = useCallback(async () => {
+        setLoadingProfessionals(true);
+        setErrorProfessionals('');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/public/professionals`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'No se pudieron cargar los profesionales disponibles.' }));
+                throw new Error(errorData.message);
+            }
+            const data = await response.json();
+            setProfessionals(data);
+
+            if (paramProfessionalId) {
+                const prof = data.find(p => p.id === paramProfessionalId);
+                if (prof) {
+                    setSelectedProfessionalId(paramProfessionalId);
+                    setSelectedProfessionalName(prof.fullName);
+                    setCurrentStep(STEPS.CALENDAR_SELECTION);
+                } else {
+                    setErrorProfessionals('El profesional seleccionado a través de la URL no es válido.');
+                    setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
                 }
-            };
-            fetchProfessionalName();
-        } else {
-            setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
+            }
+        } catch (err) {
+            console.error("Error fetching professionals:", err);
+            setErrorProfessionals(err.message);
+        } finally {
+            setLoadingProfessionals(false);
         }
     }, [paramProfessionalId]);
+
+    useEffect(() => {
+        // Solo mostramos el modal de bienvenida si no viene un ID de profesional en la URL
+        if (!paramProfessionalId) {
+            setWelcomeModalOpen(true);
+        } else {
+            setWelcomeModalOpen(false);
+        }
+        fetchProfessionals();
+    }, [fetchProfessionals, paramProfessionalId]);
 
     const handleDniLookup = async () => {
         if (!dniInput.trim()) {
@@ -80,7 +108,7 @@ const AppointmentBookingPage = () => {
             const response = await fetch(`${API_BASE_URL}/api/public/patients/lookup?dni=${dniInput.trim()}`);
             if (response.status === 404) {
                 setRecognizedPatient({ dni: dniInput.trim() });
-                throw new Error("DNI no encontrado. Por favor, complete sus datos.");
+                throw new Error("DNI no encontrado. Por favor, complete sus datos al solicitar el turno.");
             }
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -116,21 +144,34 @@ const AppointmentBookingPage = () => {
         setCurrentStep(STEPS.PATIENT_FORM);
     };
 
-    const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
-        setIsSubmitting(true);
-        setSubmissionError('');
-        try {
-            const payload = {
-                professionalId: selectedProfessionalId,
-                dateTime: appointmentDateTime.toISOString(),
-                patientDetails: patientDetails
-            };
+const handleFormSubmit = async (patientDetails, appointmentDateTime) => {
+    setIsSubmitting(true);
+    setSubmissionError('');
+    try {
+        /*
+        // --- CÓDIGO ANTIGUO (COMENTADO) ---
+        const payload = {
+            professionalId: selectedProfessionalId,
+            dateTime: appointmentDateTime.toISOString(),
+            patientDetails: patientDetails 
+        };
+        */
 
-            const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+        // --- CÓDIGO CORREGIDO Y FINAL ---
+        // Usamos el "spread operator" (...) para tomar todas las propiedades
+        // del objeto 'patientDetails' (como dni, fullName, etc.) y ponerlas
+        // directamente en el nivel superior de nuestro 'payload'.
+        const payload = {
+            professionalUserId: selectedProfessionalId, // Renombrado para consistencia con la DB
+            dateTime: appointmentDateTime.toISOString(),
+            ...patientDetails 
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
 
             const data = await response.json();
             if (!response.ok) {
@@ -140,6 +181,7 @@ const AppointmentBookingPage = () => {
             setConfirmedAppointment({
                 patient: patientDetails,
                 dateTime: appointmentDateTime,
+                professionalName: selectedProfessionalName,
                 appointmentDetails: data
             });
             setCurrentStep(STEPS.CONFIRMATION);
@@ -153,13 +195,9 @@ const AppointmentBookingPage = () => {
 
     const handleCancelForm = () => {
         if (currentStep === STEPS.CALENDAR_SELECTION) {
-            if (!paramProfessionalId) {
-                setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
-                setSelectedProfessionalId(null);
-                setSelectedProfessionalName('');
-            } else {
-                setSelectedDateTime(null);
-            }
+            setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
+            setSelectedProfessionalId(null);
+            setSelectedProfessionalName('');
         } else if (currentStep === STEPS.PATIENT_FORM) {
             setCurrentStep(STEPS.CALENDAR_SELECTION);
         }
@@ -180,6 +218,60 @@ const AppointmentBookingPage = () => {
         setIsSubmitting(false);
     };
 
+    const renderProfessionalSelection = () => {
+        if (loadingProfessionals) {
+            return (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', my: 4 }}>
+                    <CircularProgress />
+                    <Typography sx={{ ml: 2 }}>Cargando profesionales...</Typography>
+                </Box>
+            );
+        }
+        if (errorProfessionals) {
+            return <Alert severity="error" sx={{ mt: 2 }}>{errorProfessionals}</Alert>;
+        }
+        return (
+            <Container maxWidth="md">
+                <Typography variant="h4" component="h1" align="center" gutterBottom>
+                    Seleccione un Profesional
+                </Typography>
+                <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+                    Elija al profesional con quien desea agendar su turno.
+                </Typography>
+                <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+                    gap: 3
+                }}>
+                    {professionals.map((prof) => (
+                        <Card key={prof.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
+                            <Avatar sx={{ width: 80, height: 80, mb: 2, fontSize: '2.5rem', bgcolor: 'secondary.main' }}>
+                                {getInitials(prof.fullName)}
+                            </Avatar>
+                            <CardContent sx={{ textAlign: 'center', flexGrow: 1, pt: 0 }}>
+                                <Typography gutterBottom variant="h6" component="div">
+                                    {prof.fullName}
+                                </Typography>
+                                <Typography variant="body2" color="primary.main">
+                                    {prof.specialty || 'Especialidad no definida'}
+                                </Typography>
+                            </CardContent>
+                            <CardActions>
+                                <Button
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => handleSelectProfessional(prof.id, prof.fullName)}
+                                >
+                                    Seleccionar Profesional
+                                </Button>
+                            </CardActions>
+                        </Card>
+                    ))}
+                </Box>
+            </Container>
+        );
+    };
+
     return (
         <>
             <CssBaseline />
@@ -187,11 +279,11 @@ const AppointmentBookingPage = () => {
                 <Toolbar>
                     <MedicalInformationIcon sx={{ mr: 2 }} />
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        Gestión de Pacientes y Turnos UNSTA  - Solicitud de turnos
+                        Gestión de Pacientes y Turnos UNSTA - Solicitud de turnos
                     </Typography>
                 </Toolbar>
             </AppBar>
-            <Dialog open={welcomeModalOpen} disableEscapeKeyDown aria-labelledby="welcome-dialog-title" maxWidth="sm" fullWidth>
+            <Dialog open={welcomeModalOpen && !paramProfessionalId} onClose={handleCloseWelcomeModal} disableEscapeKeyDown aria-labelledby="welcome-dialog-title" maxWidth="sm" fullWidth>
                 <DialogTitle id="welcome-dialog-title" sx={{ textAlign: 'center', pt: 3 }}>Bienvenido a NutriSmart</DialogTitle>
                 <DialogContent>
                     <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -215,7 +307,7 @@ const AppointmentBookingPage = () => {
                             </Button>
                         </Box>
                         {lookupError && <Alert severity="warning" sx={{ mt: 2 }}>{lookupError}</Alert>}
-                        {recognizedPatient && recognizedPatient.id && (
+                        {dniLookupPerformed && recognizedPatient && recognizedPatient.id && (
                             <Alert severity="success" sx={{ mt: 2 }}>
                                 ¡Hola, {recognizedPatient.fullName}! Tus datos se completarán automáticamente.
                             </Alert>
@@ -225,7 +317,7 @@ const AppointmentBookingPage = () => {
                         <Typography variant="h6" component="div" gutterBottom>ATENCIÓN:</Typography>
                         <Typography variant="body2">El turno solicitado es un compromiso.</Typography>
                         <Typography variant="body2" sx={{ mt: 1 }}>
-                            Si no asistirá al turno solicitado, rogamos que cancele el mismo para liberar el horario y
+                            Si no asistirá al turno solicitado, rogamos comuncarse y cancelar el mismo para liberar el horario y
                             pueda ser usado por otro paciente. Agradecemos su compromiso y comprensión.
                         </Typography>
                     </Alert>
@@ -244,15 +336,9 @@ const AppointmentBookingPage = () => {
 
             <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                 <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    {currentStep === STEPS.PROFESSIONAL_SELECTION && (
-                        <ProfessionalSelectionStep
-                            onSelectProfessional={handleSelectProfessional}
-                            preSelectedProfessionalId={paramProfessionalId}
-                        />
-                    )}
+                    {currentStep === STEPS.PROFESSIONAL_SELECTION && renderProfessionalSelection()}
 
                     {currentStep === STEPS.CALENDAR_SELECTION && (
-                        // CORRECCIÓN: Se envuelve toda esta sección en un Box con ancho máximo para centrarla.
                         <Box sx={{ width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <Typography variant="h4" component="h1" gutterBottom>
                                 Agendar turno con {selectedProfessionalName || 'el profesional'}
@@ -262,7 +348,6 @@ const AppointmentBookingPage = () => {
                             </Typography>
                             
                             {selectedProfessionalId ? (
-                                // CORRECCIÓN: El Box que envuelve el calendario ahora es el que limita la altura y tiene scroll.
                                 <Box sx={{ width: '100%' }}>
                                      <AvailabilityCalendar
                                         onSlotSelect={handleSlotSelected}
@@ -270,13 +355,15 @@ const AppointmentBookingPage = () => {
                                     />
                                 </Box>
                             ) : (
-                                <Alert severity="error">No se ha especificado un profesional válido para mostrar la disponibilidad.</Alert>
+                                <CircularProgress />
                             )}
                             
                             <Box sx={{ mt: 3 }}>
-                                <Button variant="outlined" onClick={handleCancelForm}>
-                                    Volver a Selección de Profesional
-                                </Button>
+                                {!paramProfessionalId && (
+                                    <Button variant="outlined" onClick={handleCancelForm}>
+                                        Volver a Selección de Profesional
+                                    </Button>
+                                )}
                             </Box>
                         </Box>
                     )}

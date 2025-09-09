@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import authFetch from '../../../utils/authFetch';
 import { useAuth } from '../../../context/AuthContext';
 import {
     Box, Typography, Paper, Grid, TextField, Button, CircularProgress,
     Alert, Avatar, Stack, Dialog, DialogTitle, DialogContent,
-    DialogActions, Divider, Chip, InputAdornment, IconButton
+    DialogActions, InputAdornment, IconButton
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNotification } from '../../../context/NotificationContext';
@@ -17,13 +16,12 @@ const ProfileView = () => {
     const { authUser, login: updateAuthContextUser, loadingAuth } = useAuth();
     const [profileData, setProfileData] = useState({
         dni: '', fullName: '', email: '', phone: '', specialty: '',
-        description: '', profileImageUrl: '', profileImageFile: null,
+        description: '',
     });
     const [initialProfileData, setInitialProfileData] = useState({});
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [error, setError] = useState('');
-    const fileInputRef = useRef(null);
     const [openPasswordModal, setOpenPasswordModal] = useState(false);
     const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
     const [passwordErrors, setPasswordErrors] = useState({});
@@ -36,10 +34,8 @@ const ProfileView = () => {
     };
 
     const fetchProfile = useCallback(async () => {
-        if (loadingAuth) return;
-        if (!authUser?.user?.id) {
-            setLoading(false);
-            setError("Por favor, inicie sesión para ver su perfil.");
+        if (loadingAuth || !authUser?.user?.id) {
+            if (!loadingAuth) setLoading(false);
             return;
         }
         setLoading(true);
@@ -58,8 +54,6 @@ const ProfileView = () => {
                 email: userData.email || '', phone: userData.phone || '',
                 specialty: professionalSpecificData.specialty || '',
                 description: professionalSpecificData.description || '',
-                profileImageUrl: userData.profileImageUrl || '',
-                profileImageFile: null,
             };
             setProfileData(dataToSet);
             setInitialProfileData(dataToSet);
@@ -80,59 +74,45 @@ const ProfileView = () => {
         setError('');
     };
 
-    const handleImageChange = (event) => {
-        if (event.target.files && event.target.files[0]) {
-            const file = event.target.files[0];
-            setProfileData(prev => ({ ...prev, profileImageFile: file, profileImageUrl: URL.createObjectURL(file) }));
-            setError('');
-        }
-    };
-
     const hasChanges = () => {
-        return profileData.fullName !== initialProfileData.fullName ||
-               profileData.email !== initialProfileData.email ||
-               profileData.phone !== initialProfileData.phone ||
-               profileData.specialty !== initialProfileData.specialty ||
-               profileData.description !== initialProfileData.description ||
-               profileData.profileImageFile !== null;
+        return JSON.stringify(profileData) !== JSON.stringify(initialProfileData);
     };
 
     const handleToggleEdit = () => {
         if (isEditing && hasChanges()) {
             if (window.confirm("Tiene cambios sin guardar. ¿Desea descartarlos?")) {
                 setProfileData(initialProfileData);
-                setError(''); setIsEditing(false);
+                setError('');
+                setIsEditing(false);
             }
         } else {
-            setIsEditing(!isEditing); setError('');
+            setIsEditing(!isEditing);
+            setError('');
         }
     };
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!hasChanges()) {
-            setIsEditing(false); return;
+            setIsEditing(false);
+            return;
         }
         setLoading(true);
         setError('');
         try {
-            const formData = new FormData();
-            formData.append('fullName', profileData.fullName);
-            formData.append('email', profileData.email);
-            formData.append('phone', profileData.phone);
-
+            const payload = {
+                fullName: profileData.fullName,
+                email: profileData.email,
+                phone: profileData.phone,
+            };
             if (authUser?.user?.role === 'PROFESSIONAL') {
-                formData.append('specialty', profileData.specialty);
-                formData.append('description', profileData.description);
-            }
-            if (profileData.profileImageFile) {
-                formData.append('profileImage', profileData.profileImageFile);
+                payload.specialty = profileData.specialty;
+                payload.description = profileData.description;
             }
 
             const response = await authFetch('/api/users/me', {
                 method: 'PUT',
-                body: formData,
-                headers: { 'Content-Type': undefined },
+                body: JSON.stringify(payload),
             });
 
             await fetchProfile();
@@ -155,11 +135,13 @@ const ProfileView = () => {
         setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
         setPasswordErrors({});
     };
+
     const handlePasswordChange = (event) => {
         const { name, value } = event.target;
         setPasswordData(prev => ({ ...prev, [name]: value }));
         if (passwordErrors[name]) setPasswordErrors(prev => ({ ...prev, [name]: null }));
     };
+
     const handlePasswordSubmit = async (event) => {
         event.preventDefault();
         const errors = {};
@@ -188,10 +170,15 @@ const ProfileView = () => {
     };
 
     const getInitials = (name) => {
-        if (!name) return '';
-        const nameParts = name.split(' ');
-        if (nameParts.length > 1) return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
-        return name.substring(0, 2).toUpperCase();
+        if (!name) return '?';
+        const nameParts = name.trim().split(' ');
+        if (nameParts.length > 1 && nameParts[0] && nameParts[nameParts.length - 1]) {
+            return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+        }
+        if (nameParts[0]) {
+             return name.substring(0, 2).toUpperCase();
+        }
+        return '?';
     };
 
     if (loadingAuth) {
@@ -214,17 +201,9 @@ const ProfileView = () => {
                 <Box component="form" onSubmit={handleSubmit} noValidate>
                     <Grid container spacing={3} direction="column">
                         <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Avatar src={profileData.profileImageUrl || undefined} alt={profileData.fullName} sx={{ width: 120, height: 120, mb: 1, fontSize: '3rem' }}>
-                                {!profileData.profileImageUrl && getInitials(profileData.fullName)}
+                            <Avatar sx={{ width: 120, height: 120, mb: 1, fontSize: '3rem', bgcolor: 'primary.main' }}>
+                                {getInitials(profileData.fullName)}
                             </Avatar>
-                            {isEditing && (
-                                <>
-                                    <input accept="image/*" type="file" onChange={handleImageChange} ref={fileInputRef} style={{ display: 'none' }} id="profile-image-upload" />
-                                    <label htmlFor="profile-image-upload">
-                                        <Button variant="outlined" component="span" startIcon={<PhotoCamera />} size="small" disabled={loading}>Cambiar Foto</Button>
-                                    </label>
-                                </>
-                            )}
                         </Grid>
                         <Grid item xs={12}><TextField label="DNI" value={profileData.dni} fullWidth InputProps={{ readOnly: true }} variant="filled" helperText="El DNI no puede ser modificado."/></Grid>
                         <Grid item xs={12}><TextField required fullWidth name="fullName" label="Nombre Completo" value={profileData.fullName} onChange={handleChange} disabled={!isEditing || loading} variant={isEditing ? "outlined" : "filled"} InputProps={{ readOnly: !isEditing }}/></Grid>
