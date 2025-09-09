@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
 import {
     Container, Typography, Box, CssBaseline, AppBar, Toolbar, Alert, TextField,
     Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -152,7 +153,7 @@ const AppointmentBookingPage = () => {
             // los campos que el backend espera (firstName, lastName) en lugar de fullName.
             const payload = {
                 professionalUserId: selectedProfessionalId,
-                dateTime: appointmentDateTime.toISOString(),
+                dateTime: format(appointmentDateTime, 'yyyy-MM-dd HH:mm:ss'),
                 dni: patientDetails.dni,
                 firstName: patientDetails.firstName,
                 lastName: patientDetails.lastName,
