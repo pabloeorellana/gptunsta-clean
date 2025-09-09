@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale'; // Importación necesaria
+import { es } from 'date-fns/locale/es';
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
 
