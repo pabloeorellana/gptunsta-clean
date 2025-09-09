@@ -1,4 +1,5 @@
 import { format, parseISO, addMinutes, isBefore } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import pool from '../config/db.js';
 
 export const getRegularSchedules = async (req, res) => {
@@ -89,23 +90,19 @@ export const addTimeBlock = async (req, res) => {
         return res.status(400).json({ message: 'Fecha/hora de fin es requerida si no es todo el día.' });
     }
 
-    let parsedStart = new Date(startDateTime);
-    let parsedEnd = !isAllDay ? new Date(endDateTime) : null;
-    
-    if (isNaN(parsedStart.getTime())) return res.status(400).json({ message: 'Formato de fecha/hora de inicio inválido.' });
-    if (!isAllDay && (parsedEnd === null || isNaN(parsedEnd.getTime()))) return res.status(400).json({ message: 'Formato de fecha/hora de fin inválido.' });
-    if (!isAllDay && parsedEnd <= parsedStart) return res.status(400).json({ message: 'La fecha/hora de fin debe ser posterior a la de inicio.' });
-
-    let finalStartDate, finalEndDate;
-    if (isAllDay) {
-        finalStartDate = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate(), 0, 0, 0);
-        finalEndDate = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate(), 23, 59, 59);
-    } else {
-        finalStartDate = parsedStart;
-        finalEndDate = parsedEnd;
-    }
-
     try {
+        const parsedStart = new Date(startDateTime);
+        const parsedEnd = !isAllDay ? new Date(endDateTime) : null;
+        
+        let finalStartDate, finalEndDate;
+        if (isAllDay) {
+            finalStartDate = new Date(Date.UTC(parsedStart.getUTCFullYear(), parsedStart.getUTCMonth(), parsedStart.getUTCDate(), 0, 0, 0));
+            finalEndDate = new Date(Date.UTC(parsedStart.getUTCFullYear(), parsedStart.getUTCMonth(), parsedStart.getUTCDate(), 23, 59, 59));
+        } else {
+            finalStartDate = parsedStart;
+            finalEndDate = parsedEnd;
+        }
+
         const [result] = await pool.query(
             'INSERT INTO ProfessionalTimeBlocks (professionalUserId, startDateTime, endDateTime, reason, isAllDay) VALUES (?, ?, ?, ?, ?)',
             [professionalUserId, finalStartDate, finalEndDate, reason || null, !!isAllDay]
@@ -149,70 +146,72 @@ export const getAvailability = async (req, res) => {
     if (!date || !professionalId) {
         return res.status(400).json({ message: "Se requiere fecha y ID del profesional." });
     }
+
     try {
-        const requestedDateMiddayLocal = new Date(`${date}T12:00:00`);
-        const dayOfWeek = requestedDateMiddayLocal.getDay();
+        const requestedDate = new Date(`${date}T12:00:00Z`);
+        const dayOfWeek = requestedDate.getUTCDay();
+
         const [schedules] = await pool.query(
             'SELECT startTime, endTime, slotDurationMinutes FROM ProfessionalAvailability WHERE professionalUserId = ? AND dayOfWeek = ?',
             [professionalId, dayOfWeek]
         );
+
         if (schedules.length === 0) {
             return res.json([]);
         }
-        const [appointments] = await pool.query(
+
+        const [bookedAppointments] = await pool.query(
             'SELECT dateTime FROM Appointments WHERE professionalUserId = ? AND DATE(dateTime) = ? AND status NOT LIKE ?',
             [professionalId, date, 'CANCELED%']
         );
-        const [blocks] = await pool.query(
-            'SELECT startDateTime, endDateTime FROM ProfessionalTimeBlocks WHERE professionalUserId = ? AND startDateTime <= ? AND endDateTime >= ?',
-            [professionalId, `${date} 23:59:59`, `${date} 00:00:00`]
+        
+        const bookedSlots = new Set(
+            bookedAppointments.map(appt => formatInTimeZone(appt.dateTime, 'UTC', 'HH:mm'))
         );
-        const bookedPeriods = appointments.map(a => ({
-            start: new Date(a.dateTime),
-            end: addMinutes(new Date(a.dateTime), schedules[0].slotDurationMinutes)
-        }));
-        const blockedPeriods = blocks.map(b => ({
-            start: new Date(b.startDateTime),
-            end: new Date(b.endDateTime)
-        }));
+
+        const [blocks] = await pool.query(
+            'SELECT startDateTime, endDateTime FROM ProfessionalTimeBlocks WHERE professionalUserId = ? AND ? BETWEEN DATE(startDateTime) AND DATE(endDateTime)',
+            [professionalId, date]
+        );
+
         const availableSlots = [];
-        const now = new Date();
+        const nowUTC = new Date();
+
         for (const schedule of schedules) {
             const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
-            let currentSlotStart = new Date(requestedDateMiddayLocal.getFullYear(), requestedDateMiddayLocal.getMonth(), requestedDateMiddayLocal.getDate(), startHour, startMinute, 0, 0);
+            let currentSlotStart = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate(), startHour, startMinute));
+
             const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
-            const scheduleEnd = new Date(requestedDateMiddayLocal.getFullYear(), requestedDateMiddayLocal.getMonth(), requestedDateMiddayLocal.getDate(), endHour, endMinute, 0, 0);
-            while (isBefore(currentSlotStart, scheduleEnd)) {
+            const scheduleEnd = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate(), endHour, endMinute));
+
+            while (currentSlotStart < scheduleEnd) {
                 const currentSlotEnd = addMinutes(currentSlotStart, schedule.slotDurationMinutes);
-                if (isBefore(currentSlotEnd, now)) {
+
+                if (currentSlotStart < nowUTC) {
                     currentSlotStart = currentSlotEnd;
                     continue;
                 }
-                let isOverlapping = false;
-                for (const booked of bookedPeriods) {
-                    if (currentSlotStart < booked.end && currentSlotEnd > booked.start) {
-                        isOverlapping = true;
-                        break;
+
+                const slotString = formatInTimeZone(currentSlotStart, 'UTC', 'HH:mm');
+                let isOverlapping = bookedSlots.has(slotString);
+
+                if (!isOverlapping) {
+                    for (const block of blocks) {
+                        if (currentSlotStart < new Date(block.endDateTime) && currentSlotEnd > new Date(block.startDateTime)) {
+                            isOverlapping = true;
+                            break;
+                        }
                     }
                 }
-                if (isOverlapping) {
-                    currentSlotStart = currentSlotEnd;
-                    continue;
+
+                if (!isOverlapping) {
+                    availableSlots.push(slotString);
                 }
-                for (const blocked of blockedPeriods) {
-                    if (currentSlotStart < blocked.end && currentSlotEnd > blocked.start) {
-                        isOverlapping = true;
-                        break;
-                    }
-                }
-                if (isOverlapping) {
-                    currentSlotStart = currentSlotEnd;
-                    continue;
-                }
-                availableSlots.push(format(currentSlotStart, 'HH:mm'));
+                
                 currentSlotStart = currentSlotEnd;
             }
         }
+        
         res.json(availableSlots);
     } catch (error) {
         console.error("Error en getAvailability:", error);

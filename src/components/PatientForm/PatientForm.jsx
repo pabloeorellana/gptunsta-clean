@@ -8,12 +8,12 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
         firstName: '',
         email: '',
         phone: '',
-        reasonForVisit: '',
+        reasonForVisit: '', // Corregido de 'motivo' a 'reasonForVisit'
     });
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
-        if (prefilledData && prefilledData.id) {
+        if (prefilledData) {
             setPatientDetails(prevDetails => ({
                 ...prevDetails,
                 dni: prefilledData.dni || '',
@@ -21,11 +21,6 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
                 firstName: prefilledData.firstName || '',
                 email: prefilledData.email || '',
                 phone: prefilledData.phone || '',
-            }));
-        } else if (prefilledData && prefilledData.dni && !prefilledData.id) {
-            setPatientDetails(prevDetails => ({
-                ...prevDetails,
-                dni: prefilledData.dni,
             }));
         }
     }, [prefilledData]);
@@ -118,9 +113,11 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
                     </Grid>
                     <Grid item>
                         <TextField
-                            name="reasonForVisit" label="Motivo de la consulta (Opcional)"
+                            name="reasonForVisit"
+                            label="Motivo de la consulta (Opcional)"
                             multiline rows={3} fullWidth
-                            value={patientDetails.reasonForVisit || ''} onChange={handleChange}
+                            value={patientDetails.reasonForVisit || ''}
+                            onChange={handleChange}
                         />
                     </Grid>
                     <Grid item container spacing={2} sx={{ mt: 1 }}>
