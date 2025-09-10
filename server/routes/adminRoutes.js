@@ -17,7 +17,8 @@ router.route('/users')
 router.route('/users/:id')
     .get(getUserById)
     .put(updateUser)
-    .delete(toggleUserStatus);
+    .patch(toggleUserStatus)
+    .delete(deleteUserPermanently);
 
 router.route('/users/:id/reset-password')
     .put(resetUserPassword);

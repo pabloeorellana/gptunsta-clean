@@ -182,3 +182,40 @@ export const deletePatientPermanently = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
+export const deleteUserPermanently = async (req, res) => {
+    const { id: userId } = req.params;
+    // Medida de seguridad para evitar que un admin se borre a sí mismo
+    if (req.user.userId === userId) {
+        return res.status(400).json({ message: 'No puede eliminar su propia cuenta de administrador.' });
+    }
+    
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Primero, intentamos borrar de la tabla Professionals, ya que no todos los usuarios están ahí
+        // No nos importa si falla (si el usuario no es profesional), por eso no verificamos affectedRows
+        await connection.execute('DELETE FROM Professionals WHERE userId = ?', [userId]);
+
+        // Luego, borramos el usuario de la tabla principal Users
+        // Las restricciones ON DELETE CASCADE de la DB se encargarán de borrar datos asociados
+        // (como notificaciones, bloqueos, disponibilidad, etc.)
+        const [userResult] = await connection.execute('DELETE FROM Users WHERE id = ?', [userId]);
+
+        if (userResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+
+        await connection.commit();
+        res.json({ message: 'Usuario y todos sus datos asociados han sido eliminados permanentemente.' });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error('Error en deleteUserPermanently (admin):', error);
+        res.status(500).json({ message: 'Error del servidor al eliminar el usuario permanentemente.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};

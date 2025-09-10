@@ -44,6 +44,8 @@ const UserManagementView = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [openToggleStatusConfirmModal, setOpenToggleStatusConfirmModal] = useState(false);
     const [userToToggle, setUserToToggle] = useState(null);
+    const [openDeleteConfirmModal, setOpenDeleteConfirmModal] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
 
     // Simplificamos la función para que solo cargue usuarios
     const fetchUsers = useCallback(async () => {
@@ -143,7 +145,8 @@ const UserManagementView = () => {
     const handleConfirmToggleUserStatus = async () => {
         if (!userToToggle) return;
         try {
-            await authFetch(`/api/admin/users/${userToToggle.id}`, { method: 'DELETE' });
+            // Usamos PATCH para el cambio de estado, es más correcto semánticamente
+            await authFetch(`/api/admin/users/${userToToggle.id}`, { method: 'PATCH' });
             const action = userToToggle.isActive ? 'desactivado' : 'reactivado';
             showNotification(`Usuario ${action} exitosamente.`, 'success');
             fetchUsers();
@@ -197,6 +200,24 @@ const UserManagementView = () => {
             showNotification(err.message || 'Error al restablecer la contraseña.', 'error');
         }
     };
+    
+    const handleDeleteUserRequest = (user) => {
+        setUserToDelete(user);
+        setOpenDeleteConfirmModal(true);
+    };
+    const handleConfirmDeleteUser = async () => {
+        if (!userToDelete) return;
+        try {
+            await authFetch(`/api/admin/users/${userToDelete.id}`, { method: 'DELETE' });
+            showNotification(`Usuario ${userToDelete.fullName} eliminado permanentemente.`, 'success');
+            fetchUsers();
+        } catch (err) {
+            showNotification(err.message || 'Error al eliminar el usuario.', 'error');
+        } finally {
+            setOpenDeleteConfirmModal(false);
+            setUserToDelete(null);
+        }
+    };
 
     const handleClickShowPassword = () => setShowPassword((show) => !show);
     const handleMouseDownPassword = (event) => event.preventDefault();
@@ -238,6 +259,15 @@ const UserManagementView = () => {
                                 </IconButton>
                             </Tooltip>
                         )}
+                        {/* --- (AÑADIDO) Botón de eliminación permanente --- */}
+                        {/* Solo mostramos el botón si el usuario no es el admin logueado */}
+                        {authUser.user.id !== row.original.id && (
+                             <Tooltip title="Eliminar Permanentemente">
+                                <IconButton color="error" onClick={() => handleDeleteUserRequest(row.original)}>
+                                    <DeleteForeverIcon />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                     </Box>
                 )}
                 renderTopToolbarCustomActions={() => (
@@ -246,7 +276,24 @@ const UserManagementView = () => {
                     </Button>
                 )}
             />
-
+            {/* --- (AÑADIDO) Modal de confirmación para eliminación permanente --- */}
+            <Dialog open={openDeleteConfirmModal} onClose={() => setOpenDeleteConfirmModal(false)}>
+                <DialogTitle sx={{color: 'error.main'}}>Confirmar Eliminación Permanente</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        ¿Está absolutamente seguro de que desea eliminar al usuario <strong>{userToDelete?.fullName}</strong>?
+                    </DialogContentText>
+                    <DialogContentText sx={{mt: 1, fontWeight: 'bold'}}>
+                        Esta acción no se puede deshacer y borrará todos sus datos asociados.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDeleteConfirmModal(false)}>Cancelar</Button>
+                    <Button onClick={handleConfirmDeleteUser} color="error" variant="contained">
+                        Sí, Eliminar
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <Dialog open={isModalOpen} onClose={handleCloseModal} maxWidth="xs" fullWidth>
                 <DialogTitle>{isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'}</DialogTitle>
                 <DialogContent>
