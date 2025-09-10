@@ -21,24 +21,26 @@ const AvailabilityCalendar = ({ onSlotSelect, professionalId }) => {
 
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
-        fetch(`${API_BASE_URL}/api/public/availability?date=${dateKey}&professionalId=${professionalId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Error ${response.status} del servidor al obtener horarios.`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                setAvailableSlots(data || []);
-            })
-            .catch(err => {
-                console.error("Error al obtener horarios:", err);
-                setError('No se pudieron cargar los horarios. Intente más tarde.');
-            })
-            .finally(() => {
-                setLoadingSlots(false);
-            });
-    }, [selectedDate, professionalId]);
+        fetch(`${API_BASE_URL}/api/public/availability?date=${dateKey}&professionalId=${professionalId}`, {
+         cache: "no-store" 
+     })
+         .then(response => {
+             if (!response.ok) {
+                 throw new Error(`Error ${response.status} del servidor al obtener horarios.`);
+             }
+             return response.json();
+         })
+         .then(data => {
+             setAvailableSlots(data || []);
+         })
+         .catch(err => {
+             console.error("Error al obtener horarios:", err);
+             setError('No se pudieron cargar los horarios. Intente más tarde.');
+         })
+         .finally(() => {
+             setLoadingSlots(false);
+         });
+         }, [selectedDate, professionalId]);
 
     const handleDateChange = (newDate) => {
         setSelectedDate(newDate);
