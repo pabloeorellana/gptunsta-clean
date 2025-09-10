@@ -148,8 +148,8 @@ export const getAvailability = async (req, res) => {
     }
 
     try {
-        const requestedDate = new Date(`${date}T12:00:00Z`);
-        const dayOfWeek = requestedDate.getUTCDay(); // Domingo=0, Lunes=1...
+        const requestedDate = new Date(`${date}T12:00:00Z`); // Usamos Z para indicar que la fecha es UTC
+        const dayOfWeek = requestedDate.getUTCDay(); // getUTCDay() devuelve Domingo=0, Lunes=1...
 
         // 1. Obtener las reglas de horario para ese día
         const [schedules] = await pool.query(
@@ -158,15 +158,16 @@ export const getAvailability = async (req, res) => {
         );
 
         if (schedules.length === 0) {
-            return res.json([]); // No hay horarios definidos para este día
+            return res.json([]); // No hay horarios definidos, devuelve un array vacío
         }
 
-        // 2. Obtener TODOS los periodos OCUPADOS para ese día (turnos y bloqueos)
+        // 2. Obtener los turnos YA RESERVADOS para ese día y profesional
         const [bookedAppointments] = await pool.query(
             'SELECT dateTime FROM Appointments WHERE professionalUserId = ? AND DATE(dateTime) = ? AND status NOT LIKE \'CANCELED%\'',
             [professionalId, date]
         );
-
+        
+        // 3. Obtener los BLOQUEOS de tiempo para ese día y profesional
         const [timeBlocks] = await pool.query(
             'SELECT startDateTime, endDateTime FROM ProfessionalTimeBlocks WHERE professionalUserId = ? AND ? BETWEEN DATE(startDateTime) AND DATE(endDateTime)',
             [professionalId, date]
@@ -182,36 +183,36 @@ export const getAvailability = async (req, res) => {
             const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
             const scheduleEnd = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate(), endHour, endMinute));
 
-            // Genera todos los slots posibles según el horario
+            // Genera todos los slots posibles dentro del horario
             while (currentSlotStart < scheduleEnd) {
-                const slotString = formatInTimeZone(currentSlotStart, 'UTC', 'HH:mm');
-                allAvailableSlots.push({ date: new Date(currentSlotStart), string: slotString });
-                currentSlotStart = addMinutes(currentSlotStart, schedule.slotDurationMinutes);
+                const currentSlotEnd = addMinutes(currentSlotStart, schedule.slotDurationMinutes);
+                
+                // Comprobación 1: No mostrar horarios que ya pasaron
+                if (currentSlotStart < nowUTC) {
+                    currentSlotStart = currentSlotEnd;
+                    continue;
+                }
+
+                // Comprobación 2: ¿Está este slot ya reservado?
+                const isBooked = bookedAppointments.some(appt => 
+                    new Date(appt.dateTime).getTime() === currentSlotStart.getTime()
+                );
+                
+                // Comprobación 3: ¿Cae este slot dentro de un bloqueo?
+                const isBlocked = timeBlocks.some(block => 
+                    currentSlotStart >= new Date(block.startDateTime) && currentSlotStart < new Date(block.endDateTime)
+                );
+
+                // Si pasa todas las comprobaciones, el slot está disponible
+                if (!isBooked && !isBlocked) {
+                    allAvailableSlots.push(formatInTimeZone(currentSlotStart, 'UTC', 'HH:mm'));
+                }
+                
+                currentSlotStart = currentSlotEnd;
             }
         }
         
-        // 3. Filtrar los slots
-        const finalSlots = allAvailableSlots.filter(slot => {
-            // A. No mostrar horarios que ya pasaron
-            if (slot.date < nowUTC) return false;
-
-            // B. Quitar slots que coincidan con un turno reservado
-            const isBooked = bookedAppointments.some(appt => 
-                new Date(appt.dateTime).getTime() === slot.date.getTime()
-            );
-            if (isBooked) return false;
-            
-            // C. Quitar slots que caigan dentro de un bloqueo
-            const isBlocked = timeBlocks.some(block => 
-                slot.date >= new Date(block.startDateTime) && slot.date < new Date(block.endDateTime)
-            );
-            if (isBlocked) return false;
-
-            return true;
-        });
-
-        // 4. Devolver solo las cadenas de texto de los horarios finales
-        res.json(finalSlots.map(slot => slot.string));
+        res.json(allAvailableSlots);
 
     } catch (error) {
         console.error("Error en getAvailability:", error);
