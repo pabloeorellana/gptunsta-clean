@@ -1,7 +1,7 @@
 import express from 'express';
 import { 
     getAllUsers, createUser, getUserById, updateUser, toggleUserStatus, resetUserPassword,
-    deletePatientPermanently
+    deletePatientPermanently, deleteUserPermanently
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 

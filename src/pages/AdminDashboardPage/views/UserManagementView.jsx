@@ -10,6 +10,7 @@ import { MRT_Localization_ES } from 'material-react-table/locales/es';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import ArchiveIcon from '@mui/icons-material/Archive';
