@@ -1,6 +1,7 @@
+// En: src/pages/AppointmentBookingPage/AppointmentBookingPage.jsx
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+// --- CAMBIO: Eliminamos las importaciones de date-fns y date-fns-tz ---
 import {
     Container, Typography, Box, CssBaseline, AppBar, Toolbar, Alert, TextField,
     Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -149,12 +150,13 @@ const AppointmentBookingPage = () => {
         setIsSubmitting(true);
         setSubmissionError('');
         try {
-            // --- CÓDIGO CORREGIDOS Y FINAL ---
-            // Construimos el payload de forma explícita, asegurándonos de enviar
-            // los campos que el backend espera (firstName, lastName) en lugar de fullName.
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Usamos el método nativo .toISOString() en el objeto Date.
+            // Esto envía una fecha universal estándar (ej: "2025-09-15T13:00:00.000Z")
+            // que el backend con Luxon puede interpretar sin problemas.
             const payload = {
                 professionalUserId: selectedProfessionalId,
-                dateTime: formatInTimeZone(appointmentDateTime, 'UTC', 'yyyy-MM-dd HH:mm:ss'),
+                dateTime: appointmentDateTime.toISOString(), // <-- ESTA ES LA LÍNEA CLAVE
                 dni: patientDetails.dni,
                 firstName: patientDetails.firstName,
                 lastName: patientDetails.lastName,
@@ -162,10 +164,8 @@ const AppointmentBookingPage = () => {
                 phone: patientDetails.phone,
                 reasonForVisit: patientDetails.reasonForVisit
             };
+            // --- FIN DE LA CORRECCIÓN ---
             
-            // Eliminamos la construcción de fullName aquí, ya que se hará en el backend
-            // payload.fullName = `${patientDetails.firstName} ${patientDetails.lastName}`;
-
             const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

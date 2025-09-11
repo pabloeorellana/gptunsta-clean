@@ -1,5 +1,4 @@
-import { format, parseISO, addMinutes, isBefore } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { DateTime } from 'luxon'; // Usaremos Luxon para todo el manejo de fechas
 import pool from '../config/db.js';
 
 export const getRegularSchedules = async (req, res) => {
@@ -142,73 +141,77 @@ export const removeTimeBlock = async (req, res) => {
 };
 
 export const getAvailability = async (req, res) => {
-    const { date, professionalId } = req.query;
+    const { date, professionalId } = req.query; // date es 'yyyy-MM-dd'
     if (!date || !professionalId) {
         return res.status(400).json({ message: "Se requiere fecha y ID del profesional." });
     }
 
     try {
-        const requestedDate = new Date(`${date}T12:00:00Z`); // Usamos Z para indicar que la fecha es UTC
-        const dayOfWeek = requestedDate.getUTCDay(); // getUTCDay() devuelve Domingo=0, Lunes=1...
+        const timeZone = 'America/Argentina/Buenos_Aires';
+        const requestedDateLuxon = DateTime.fromISO(date, { zone: timeZone });
+        const dayOfWeek = requestedDateLuxon.weekday; // Luxon: Lunes=1, Domingo=7. Ajustamos la consulta.
 
-        // 1. Obtener las reglas de horario para ese día
         const [schedules] = await pool.query(
             'SELECT startTime, endTime, slotDurationMinutes FROM ProfessionalAvailability WHERE professionalUserId = ? AND dayOfWeek = ?',
             [professionalId, dayOfWeek]
         );
 
         if (schedules.length === 0) {
-            return res.json([]); // No hay horarios definidos, devuelve un array vacío
+            return res.json([]);
         }
 
-        // 2. Obtener los turnos YA RESERVADOS para ese día y profesional
+        const startOfDayUTC = requestedDateLuxon.startOf('day').toUTC().toISO();
+        const endOfDayUTC = requestedDateLuxon.endOf('day').toUTC().toISO();
+
         const [bookedAppointments] = await pool.query(
-            'SELECT dateTime FROM Appointments WHERE professionalUserId = ? AND DATE(dateTime) = ? AND status NOT LIKE \'CANCELED%\'',
-            [professionalId, date]
+            `SELECT DATE_FORMAT(dateTime, '%Y-%m-%dT%H:%i:%SZ') as dateTime 
+             FROM Appointments 
+             WHERE professionalUserId = ? AND status NOT LIKE 'CANCELED%' AND dateTime BETWEEN ? AND ?`,
+            [professionalId, startOfDayUTC, endOfDayUTC]
         );
         
-        // 3. Obtener los BLOQUEOS de tiempo para ese día y profesional
         const [timeBlocks] = await pool.query(
-            'SELECT startDateTime, endDateTime FROM ProfessionalTimeBlocks WHERE professionalUserId = ? AND ? BETWEEN DATE(startDateTime) AND DATE(endDateTime)',
+            `SELECT DATE_FORMAT(startDateTime, '%Y-%m-%dT%H:%i:%SZ') as startDateTime, 
+                    DATE_FORMAT(endDateTime, '%Y-%m-%dT%H:%i:%SZ') as endDateTime 
+             FROM ProfessionalTimeBlocks 
+             WHERE professionalUserId = ? AND ? BETWEEN DATE(startDateTime) AND DATE(endDateTime)`,
             [professionalId, date]
         );
 
         const allAvailableSlots = [];
-        const nowUTC = new Date();
+        const nowUTC = DateTime.utc();
 
         for (const schedule of schedules) {
-            const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
-            let currentSlotStart = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate(), startHour, startMinute));
+            // 1. Creamos objetos de fecha/hora LOCALES usando Luxon
+            // Esto interpreta "09:00:00" como hora de Argentina para el día `date`.
+            let currentSlot = DateTime.fromISO(`${date}T${schedule.startTime}`, { zone: timeZone });
+            const scheduleEnd = DateTime.fromISO(`${date}T${schedule.endTime}`, { zone: timeZone });
 
-            const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
-            const scheduleEnd = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate(), endHour, endMinute));
-
-            // Genera todos los slots posibles dentro del horario
-            while (currentSlotStart < scheduleEnd) {
-                const currentSlotEnd = addMinutes(currentSlotStart, schedule.slotDurationMinutes);
-                
-                // Comprobación 1: No mostrar horarios que ya pasaron
-                if (currentSlotStart < nowUTC) {
-                    currentSlotStart = currentSlotEnd;
+            // 2. El bucle ahora funciona con objetos Luxon
+            while (currentSlot < scheduleEnd) {
+                // Comparamos en UTC para consistencia
+                if (currentSlot.toUTC() < nowUTC) {
+                    currentSlot = currentSlot.plus({ minutes: schedule.slotDurationMinutes });
                     continue;
                 }
 
-                // Comprobación 2: ¿Está este slot ya reservado?
+                // La comparación es ahora precisa usando milisegundos
                 const isBooked = bookedAppointments.some(appt => 
-                    new Date(appt.dateTime).getTime() === currentSlotStart.getTime()
+                    DateTime.fromISO(appt.dateTime).toMillis() === currentSlot.toMillis()
                 );
                 
-                // Comprobación 3: ¿Cae este slot dentro de un bloqueo?
                 const isBlocked = timeBlocks.some(block => 
-                    currentSlotStart >= new Date(block.startDateTime) && currentSlotStart < new Date(block.endDateTime)
+                    currentSlot.toMillis() >= DateTime.fromISO(block.startDateTime).toMillis() && 
+                    currentSlot.toMillis() < DateTime.fromISO(block.endDateTime).toMillis()
                 );
 
-                // Si pasa todas las comprobaciones, el slot está disponible
                 if (!isBooked && !isBlocked) {
-                    allAvailableSlots.push(formatInTimeZone(currentSlotStart, 'UTC', 'HH:mm'));
+                    // Formateamos el slot para mostrarlo en el frontend
+                    allAvailableSlots.push(currentSlot.toFormat('HH:mm'));
                 }
                 
-                currentSlotStart = currentSlotEnd;
+                // Luxon es inmutable, así que creamos un nuevo objeto para el siguiente slot
+                currentSlot = currentSlot.plus({ minutes: schedule.slotDurationMinutes });
             }
         }
         

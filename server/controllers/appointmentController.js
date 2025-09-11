@@ -1,10 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale/es'; // Se mantiene esta importación, es la correcta
-import { formatInTimeZone } from 'date-fns-tz';
+import { DateTime } from 'luxon'; // Usamos Luxon en lugar de date-fns
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
-// La importación duplicada de 'es' ha sido eliminada.
 
 export const getAppointments = async (req, res) => {
     const { userId, role } = req.user;
@@ -18,7 +15,9 @@ export const getAppointments = async (req, res) => {
         if (role === 'ADMIN') {
             query = `
                 SELECT
-                    a.id, a.dateTime AS start, DATE_ADD(a.dateTime, INTERVAL 30 MINUTE) AS end,
+                    a.id, 
+                    DATE_FORMAT(a.dateTime, '%Y-%m-%dT%H:%i:%SZ') AS start, 
+                    DATE_FORMAT(DATE_ADD(a.dateTime, INTERVAL 30 MINUTE), '%Y-%m-%dT%H:%i:%SZ') AS end,
                     p.fullName AS title, a.status, a.reasonForVisit, a.professionalNotes,
                     a.patientId, p.dni AS patientDni, p.email AS patientEmail, p.phone AS patientPhone,
                     u.fullName AS professionalName
@@ -31,7 +30,9 @@ export const getAppointments = async (req, res) => {
         } else {
             query = `
                 SELECT
-                    a.id, a.dateTime AS start, DATE_ADD(a.dateTime, INTERVAL 30 MINUTE) AS end,
+                    a.id, 
+                    DATE_FORMAT(a.dateTime, '%Y-%m-%dT%H:%i:%SZ') AS start, 
+                    DATE_FORMAT(DATE_ADD(a.dateTime, INTERVAL 30 MINUTE), '%Y-%m-%dT%H:%i:%SZ') AS end,
                     p.fullName AS title, a.status, a.reasonForVisit, a.professionalNotes,
                     a.patientId, p.dni AS patientDni, p.email AS patientEmail, p.phone AS patientPhone
                 FROM Appointments a
@@ -56,23 +57,24 @@ export const createManualAppointment = async (req, res) => {
     }
     try {
         const appointmentId = `appt_${uuidv4()}`;
+        const appointmentDateTime = DateTime.fromISO(dateTime).toUTC().toFormat('yyyy-MM-dd HH:mm:ss');
 
         await pool.query(
             'INSERT INTO Appointments (id, dateTime, patientId, professionalUserId, reasonForVisit, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [appointmentId, new Date(dateTime), patientId, professionalUserId, reasonForVisit || null, 'SCHEDULED']
+            [appointmentId, appointmentDateTime, patientId, professionalUserId, reasonForVisit || null, 'SCHEDULED']
         );
         const [patientData] = await pool.query('SELECT fullName FROM Patients WHERE id = ?', [patientId]);
         const patientName = patientData.length > 0 ? patientData[0].fullName : 'Paciente';
         
-        // Usamos formatInTimeZone para mostrar la hora correcta en la notificación
-        const notificationMessage = `Turno manual añadido para ${patientName} el ${formatInTimeZone(new Date(dateTime), 'America/Argentina/Buenos_Aires', "dd/MM 'a las' HH:mm", { locale: es })}.`;
+        // Usamos Luxon para formatear la fecha para la notificación
+        const notificationMessage = `Turno manual añadido para ${patientName} el ${DateTime.fromISO(dateTime).setZone('America/Argentina/Buenos_Aires').toFormat("dd/MM 'a las' HH:mm", { locale: 'es' })}.`;
         
         await pool.query(
             'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',
             [professionalUserId, notificationMessage, `/profesional/dashboard/agenda?appointmentId=${appointmentId}`]
         );
         const [newAppointment] = await pool.query(`
-            SELECT a.id, a.dateTime AS start, DATE_ADD(a.dateTime, INTERVAL 30 MINUTE) AS end, p.fullName AS title, a.status, a.reasonForVisit, a.professionalNotes, a.patientId, p.dni AS patientDni, p.email AS patientEmail, p.phone AS patientPhone
+            SELECT a.id, DATE_FORMAT(a.dateTime, '%Y-%m-%dT%H:%i:%SZ') AS start, DATE_FORMAT(DATE_ADD(a.dateTime, INTERVAL 30 MINUTE), '%Y-%m-%dT%H:%i:%SZ') AS end, p.fullName AS title, a.status, a.reasonForVisit, a.professionalNotes, a.patientId, p.dni AS patientDni, p.email AS patientEmail, p.phone AS patientPhone
             FROM Appointments a JOIN Patients p ON a.patientId = p.id WHERE a.id = ?`,
             [appointmentId]
         );
@@ -119,8 +121,9 @@ export const reprogramAppointment = async (req, res) => {
         return res.status(400).json({ message: 'Se requiere una nueva fecha y hora.' });
     }
     try {
+        const newDateTimeUTC = DateTime.fromISO(newDateTime).toUTC().toFormat('yyyy-MM-dd HH:mm:ss');
         let query = 'UPDATE Appointments SET dateTime = ? WHERE id = ?';
-        const params = [new Date(newDateTime), appointmentId];
+        const params = [newDateTimeUTC, appointmentId];
         if (role !== 'ADMIN') {
             query += ' AND professionalUserId = ?';
             params.push(userId);
@@ -212,24 +215,29 @@ export const createPublicAppointment = async (req, res) => {
          }
 
          const appointmentId = `appt_${uuidv4()}`;
+         const appointmentDateTimeUTC = DateTime.fromISO(dateTime).toUTC().toFormat('yyyy-MM-dd HH:mm:ss');
          await connection.query(
              'INSERT INTO Appointments (id, professionalUserId, dateTime, patientId, reasonForVisit) VALUES (?, ?, ?, ?, ?)',
-             [appointmentId, professionalUserId, dateTime, patientId, reasonForVisit || null]
+             [appointmentId, professionalUserId, appointmentDateTimeUTC, patientId, reasonForVisit || null]
          );
          const [professionalData] = await connection.query('SELECT fullName, email FROM Users WHERE id = ?', [professionalUserId]);
 
          if (professionalData.length > 0) {
             const professional = professionalData[0];
+            
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Corregimos el orden de los argumentos para que coincida con la definición de la función
             await sendAppointmentConfirmationEmail(
-                email,
-                fullName,
-                new Date(dateTime),
-                professional.fullName,
-                professional.email
+                email,                      // 1. patientEmail
+                fullName,                   // 2. patientName
+                professional.fullName,      // 3. professionalName (antes estaba dateTime)
+                DateTime.fromISO(dateTime).toJSDate(), // 4. dateTime (antes estaba professional.fullName)
+                reasonForVisit              // 5. reasonForVisit (antes estaba professional.email)
             );
+            // --- FIN DE LA CORRECCIÓN ---
          }
 
-         const notificationMessage = `Nuevo turno de ${fullName} para el ${formatInTimeZone(new Date(dateTime), 'America/Argentina/Buenos_Aires', 'dd/MM \'a las\' HH:mm', { locale: es })}.`;
+         const notificationMessage = `Nuevo turno de ${fullName} para el ${DateTime.fromISO(dateTime).setZone('America/Argentina/Buenos_Aires').toFormat("dd/MM 'a las' HH:mm", { locale: 'es' })}.`;
          const notificationLink = `/profesional/dashboard/agenda?appointmentId=${appointmentId}`;
          await connection.query(
              'INSERT INTO Notifications (userId, message, link) VALUES (?, ?, ?)',

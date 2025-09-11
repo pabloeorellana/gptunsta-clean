@@ -24,16 +24,16 @@
     "@fullcalendar/timegrid": "^6.1.17",
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
-    "@mui/x-date-pickers": "^8.5.0",
+    "@mui/x-date-pickers": "^7.9.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
-    "date-fns": "^4.1.0",
-    "date-fns-tz": "^3.2.0",
+    "date-fns": "^2.30.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.1",
+    "luxon": "^3.7.2",
     "material-react-table": "^3.2.1",
     "multer": "^2.0.2",
     "mysql2": "^3.14.1",
@@ -68,5 +68,8 @@
   "engines": {
     "node": "20.x",
     "npm": "10.x"
+  },
+  "overrides": {
+    "date-fns": "^2.30.0"
   }
 }

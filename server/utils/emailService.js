@@ -1,13 +1,14 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv'; 
 import crypto from 'crypto';
+import { DateTime } from 'luxon'; // <-- CAMBIO: Importamos Luxon
 
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,
-    secure: process.env.EMAIL_PORT == 465, // true for 465 (SSL/TLS), false for other ports (STARTTLS)
+    secure: process.env.EMAIL_PORT == 465, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
@@ -20,14 +21,15 @@ export const sendAppointmentConfirmationEmail = async (patientEmail, patientName
         return; 
     }
 
-    const dateObj = new Date(dateTime);
-    const formattedDate = dateObj.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const formattedTime = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    // --- CAMBIO: Usamos Luxon para un formateo más robusto ---
+    const dateObj = DateTime.fromJSDate(dateTime).setZone('America/Argentina/Buenos_Aires');
+    const formattedDate = dateObj.toFormat('cccc, dd \'de\' LLLL \'de\' yyyy', { locale: 'es' });
+    const formattedTime = dateObj.toFormat('HH:mm');
 
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-                <h2 style="color: #00979e; text-align: center;">Confirmación de Turno NutriSmart</h2>
+                <h2 style="color: #00979e; text-align: center;">Confirmación de Turno - Consultorio Nutricional</h2>
                 <p>Estimado/a <strong>${patientName}</strong>,</p>
                 <p>Tu turno ha sido programado exitosamente con <strong>${professionalName}</strong>.</p>
                 <p><strong>Detalles del Turno:</strong></p>
@@ -64,7 +66,6 @@ export const sendPasswordResetEmail = async (userEmail, resetToken) => {
         return;
     }
 
-    // El enlace que el usuario recibirá. Apunta a tu frontend.
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     const htmlContent = `
@@ -96,7 +97,6 @@ export const sendPasswordResetEmail = async (userEmail, resetToken) => {
         console.log(`Email de reseteo de contraseña enviado a ${userEmail}`);
     } catch (error) {
         console.error(`Error al enviar email de reseteo a ${userEmail}:`, error);
-        // Es importante lanzar el error aquí para que el controlador sepa que falló.
         throw new Error('No se pudo enviar el correo de restablecimiento.');
     }
 };
