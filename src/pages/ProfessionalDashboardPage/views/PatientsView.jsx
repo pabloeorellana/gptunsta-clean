@@ -1,3 +1,5 @@
+// En: src/pages/ProfessionalDashboardPage/views/PatientsView.jsx
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import authFetch from '../../../utils/authFetch';
 import {
@@ -18,6 +20,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import DownloadIcon from '@mui/icons-material/Download';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -26,10 +29,10 @@ import { MaterialReactTable } from 'material-react-table';
 import { MRT_Localization_ES } from 'material-react-table/locales/es';
 import { useNotification } from '../../../context/NotificationContext';
 import { useAuth } from '../../../context/AuthContext';
+import { API_BASE_URL } from '../../../config';
 
 const initialNewPatientState = { dni: '', lastName: '', firstName: '', email: '', phone: '', birthDate: null };
-const initialClinicalRecordState = { id: null, title: '', content: '', pathology: '', attachment: null, attachmentName: '' };
-//const pathologiesList = [ "Sobrepeso y Obesidad", "Diabetes Mellitus Tipo 2", "Enfermedades Cardiovasculares", "Hipertensión Arterial", "Caries Dental", "Anemia por deficiencia de hierro", "Deficiencia de Vitamina D", "Deficiencia de Yodo", "Anorexia Nerviosa", "Bulimia Nerviosa", "Otros" ];
+const initialClinicalRecordState = { id: null, title: '', content: '', pathology: '', attachment: null, attachmentName: '', attachmentPath: '' };
 
 const PatientsView = () => {
     const { showNotification } = useNotification();
@@ -60,6 +63,7 @@ const PatientsView = () => {
     const [recordToView, setRecordToView] = useState(null);
     const [openDeleteRecordConfirmModal, setOpenDeleteRecordConfirmModal] = useState(false);
     const [recordToDeleteId, setRecordToDeleteId] = useState(null);
+    const [isSavingRecord, setIsSavingRecord] = useState(false);
 
     const getInitials = (name) => {
         if (!name || typeof name !== 'string') return '';
@@ -71,23 +75,23 @@ const PatientsView = () => {
     const fetchInitialData = useCallback(async () => {
         setLoading(true);
         setError(null);
-    try {
-        const [patientsData, pathologiesData] = await Promise.all([
-            authFetch('/api/patients'),
-            authFetch('/api/catalogs/pathologies') 
-        ]);
-        
-        const processedPatients = (patientsData || []).map(p => ({
-            ...p, fullName: p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim(),
-        }));
-        
-        setPatients(processedPatients);
-        setPathologies(pathologiesData || []); 
+        try {
+            const [patientsData, pathologiesData] = await Promise.all([
+                authFetch('/api/patients'),
+                authFetch('/api/catalogs/pathologies') 
+            ]);
+            
+            const processedPatients = (patientsData || []).map(p => ({
+                ...p, fullName: p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim(),
+            }));
+            
+            setPatients(processedPatients);
+            setPathologies(pathologiesData || []); 
 
-    } catch (err) {
-        setError(err.message || "Error al cargar los datos iniciales.");
-    } finally {
-        setLoading(false);
+        } catch (err) {
+            setError(err.message || "Error al cargar los datos iniciales.");
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -136,51 +140,60 @@ const PatientsView = () => {
             }
         },
     ], []);
-
-    const handleViewPatientDetails = (patient) => setSelectedPatient(patient);
     
-    const handleEditPatient = (patient) => {
-        setPatientForValidation(patient);
-        setEditingPatientData({
-            id: patient.id, dni: patient.dni, lastName: patient.lastName || '',
-            firstName: patient.firstName || '', email: patient.email,
-            phone: patient.phone || '',
-            birthDate: patient.birthDate ? parseISO(patient.birthDate) : null,
-        });
-        setEditingPatientErrors({});
-        setOpenEditPatientModal(true);
-    };
-
-    const handleTogglePatientStatusRequest = (patient) => {
-        setPatientToToggle(patient);
-        setOpenTogglePatientStatusConfirmModal(true);
-    };
-
-    const handleConfirmTogglePatientStatus = async () => {
-        if (!patientToToggle) return;
+    const handleSaveRecord = async () => {
+        setIsSavingRecord(true);
+        let uploadedFilePath = currentRecordForm.attachmentPath || '';
+    
         try {
-            await authFetch(`/api/patients/${patientToToggle.id}`, { method: 'DELETE' });
-            const action = patientToToggle.isActive ? 'archivado' : 'reactivado';
-            showNotification(`Paciente ${action} correctamente.`, 'success');
-            if (selectedPatient && selectedPatient.id === patientToToggle.id) {
-                setSelectedPatient(null);
+            if (currentRecordForm.attachment) {
+                const formData = new FormData();
+                formData.append('attachment', currentRecordForm.attachment);
+    
+                const uploadResponse = await authFetch('/api/clinical-records/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+    
+                if (!uploadResponse.filePath) {
+                    throw new Error("La subida del archivo falló, no se recibió la ruta.");
+                }
+                uploadedFilePath = uploadResponse.filePath;
             }
-            fetchInitialData();
-        } catch (err) {
-            showNotification(err.message || `Error al cambiar el estado del paciente.`, 'error');
+    
+            const recordPayload = {
+                title: currentRecordForm.title,
+                content: currentRecordForm.content,
+                pathology: currentRecordForm.pathology,
+                attachmentName: currentRecordForm.attachment ? currentRecordForm.attachment.name : currentRecordForm.attachmentName,
+                attachmentPath: uploadedFilePath.replace(/\\/g, '/'), // Normalizamos la ruta por si acaso
+            };
+    
+            if (isEditingRecordForm) {
+                await authFetch(`/api/clinical-records/${currentRecordForm.id}`, { method: 'PUT', body: JSON.stringify(recordPayload) });
+            } else {
+                await authFetch(`/api/patients/${selectedPatient.id}/clinical-records`, { method: 'POST', body: JSON.stringify(recordPayload) });
+            }
+    
+            fetchClinicalRecords(selectedPatient.id);
+            handleCloseRecordFormModal();
+            showNotification('Registro de historia clínica guardado correctamente.', 'success');
+        } catch(err) {
+            showNotification(err.message || `Error guardando la entrada.`, 'error');
         } finally {
-            setOpenTogglePatientStatusConfirmModal(false);
-            setPatientToToggle(null);
+            setIsSavingRecord(false);
+        }
+    };
+    
+    const handleAttachmentChange = (event) => {
+        if (event.target.files && event.target.files[0]) {
+            const file = event.target.files[0];
+            setCurrentRecordForm(prev => ({ ...prev, attachment: file }));
         }
     };
 
-    const handleCloseTogglePatientStatusConfirmModal = () => {
-        setOpenTogglePatientStatusConfirmModal(false);
-        setPatientToToggle(null);
-    };
-
+    const handleViewPatientDetails = (patient) => setSelectedPatient(patient);
     const handleBackToList = () => setSelectedPatient(null);
-
     const handleOpenRecordFormModal = (recordToEdit = null) => {
         if (recordToEdit) {
             setCurrentRecordForm({ ...initialClinicalRecordState, ...recordToEdit });
@@ -191,50 +204,23 @@ const PatientsView = () => {
         }
         setOpenRecordFormModal(true);
     };
-
     const handleCloseRecordFormModal = () => {
         setOpenRecordFormModal(false);
         setCurrentRecordForm(initialClinicalRecordState);
         setIsEditingRecordForm(false);
     };
-
     const handleRecordInputChange = (event) => {
         const { name, value } = event.target;
         setCurrentRecordForm(prev => ({ ...prev, [name]: value }));
     };
-
-    const handleAttachmentChange = (event) => {
-        if (event.target.files && event.target.files[0]) {
-            const file = event.target.files[0];
-            setCurrentRecordForm(prev => ({ ...prev, attachment: file, attachmentName: file.name }));
-        }
-    };
-
-    const handleSaveRecord = async () => {
-        try {
-            if (isEditingRecordForm) {
-                await authFetch(`/api/clinical-records/${currentRecordForm.id}`, { method: 'PUT', body: JSON.stringify(currentRecordForm) });
-            } else {
-                await authFetch(`/api/patients/${selectedPatient.id}/clinical-records`, { method: 'POST', body: JSON.stringify(currentRecordForm) });
-            }
-            fetchClinicalRecords(selectedPatient.id);
-            handleCloseRecordFormModal();
-            showNotification('Registro de historia clínica guardado correctamente.', 'success');
-        } catch(err) {
-            showNotification(err.message || `Error guardando la entrada.`, 'error');
-        }
-    };
-
     const handleDeleteRecordRequest = (recordId) => {
         setRecordToDeleteId(recordId);
         setOpenDeleteRecordConfirmModal(true);
     };
-
     const handleCloseDeleteRecordConfirmModal = () => {
         setOpenDeleteRecordConfirmModal(false);
         setRecordToDeleteId(null);
     };
-
     const handleConfirmDeleteRecord = async () => {
         if (recordToDeleteId) {
             try {
@@ -247,23 +233,18 @@ const PatientsView = () => {
         }
         handleCloseDeleteRecordConfirmModal();
     };
-
     const handleOpenAddPatientModal = () => setOpenAddPatientModal(true);
-    
     const handleCloseAddPatientModal = () => {
         setOpenAddPatientModal(false);
         setNewPatientData(initialNewPatientState);
         setNewPatientErrors({});
     };
-
     const handleNewPatientChange = (event) => {
         const { name, value } = event.target;
         setNewPatientData(prev => ({ ...prev, [name]: value }));
         if (newPatientErrors[name]) setNewPatientErrors(prev => ({...prev, [name]: null}));
     };
-    
     const handleNewPatientDateChange = (newDate) => setNewPatientData(prev => ({ ...prev, birthDate: newDate }));
-
     const validateNewPatientForm = () => {
         const errors = {};
         if (!newPatientData.dni.trim()) errors.dni = 'DNI es requerido.';
@@ -275,7 +256,6 @@ const PatientsView = () => {
         setNewPatientErrors(errors);
         return Object.keys(errors).length === 0;
     };
-
     const handleSaveNewPatient = async () => {
         if (!validateNewPatientForm()) return;
         try {
@@ -289,27 +269,21 @@ const PatientsView = () => {
             showNotification(err.message || `Error al añadir el paciente.`, 'error');
         }
     };
-
     const handleCloseEditPatientModal = () => {
         setOpenEditPatientModal(false);
         setEditingPatientData(null);
         setPatientForValidation(null);
         setEditingPatientErrors({});
     };
-
     const handleEditingPatientChange = (event) => {
         const { name, value } = event.target;
         setEditingPatientData(prev => ({ ...prev, [name]: value }));
         if (editingPatientErrors[name]) setEditingPatientErrors(prev => ({...prev, [name]: null}));
     };
-
     const handleEditingPatientDateChange = (newDate) => setEditingPatientData(prev => ({ ...prev, birthDate: newDate }));
-
     const validateEditingPatientForm = () => {
         const errors = {};
-        if (!editingPatientData || !patientForValidation) {
-            return false;
-        }
+        if (!editingPatientData || !patientForValidation) return false;
         if (!editingPatientData.dni?.trim()) errors.dni = 'DNI es requerido.';
         if (editingPatientData.dni?.trim() !== patientForValidation.dni && patients.some(p => p.id !== editingPatientData.id && p.dni === editingPatientData.dni.trim())) {
             errors.dni = 'Este DNI ya está registrado para otro paciente.';
@@ -321,7 +295,6 @@ const PatientsView = () => {
         setEditingPatientErrors(errors);
         return Object.keys(errors).length === 0;
     };
-
     const handleSaveEditedPatient = async () => {
         if (!validateEditingPatientForm()) return;
         try {
@@ -339,15 +312,38 @@ const PatientsView = () => {
             showNotification(err.message || `Error al actualizar el paciente.`, 'error');
         }
     };
-
     const handleOpenViewRecordModal = (record) => {
         setRecordToView(record);
         setOpenViewRecordModal(true);
     };
-
     const handleCloseViewRecordModal = () => {
         setOpenViewRecordModal(false);
         setRecordToView(null);
+    };
+    const handleTogglePatientStatusRequest = (patient) => {
+        setPatientToToggle(patient);
+        setOpenTogglePatientStatusConfirmModal(true);
+    };
+    const handleConfirmTogglePatientStatus = async () => {
+        if (!patientToToggle) return;
+        try {
+            await authFetch(`/api/patients/${patientToToggle.id}`, { method: 'DELETE' });
+            const action = patientToToggle.isActive ? 'archivado' : 'reactivado';
+            showNotification(`Paciente ${action} correctamente.`, 'success');
+            if (selectedPatient && selectedPatient.id === patientToToggle.id) {
+                setSelectedPatient(null);
+            }
+            fetchInitialData();
+        } catch (err) {
+            showNotification(err.message || `Error al cambiar el estado del paciente.`, 'error');
+        } finally {
+            setOpenTogglePatientStatusConfirmModal(false);
+            setPatientToToggle(null);
+        }
+    };
+    const handleCloseTogglePatientStatusConfirmModal = () => {
+        setOpenTogglePatientStatusConfirmModal(false);
+        setPatientToToggle(null);
     };
 
     if (loading) { return ( <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box> ); }
@@ -381,16 +377,6 @@ const PatientsView = () => {
                         enableColumnResizing
                         layoutMode="grid"
                         muiTablePaperProps={{ elevation: 0 }}
-                        muiTableHeadCellProps={{ sx: { fontWeight: 'normal', color: 'text.secondary', borderBottom: '1px solid rgba(224, 224, 224, 1)' } }}
-                        muiTableBodyCellProps={{ sx: { padding: '12px 16px', border: 'none' } }}
-                        muiTableBodyRowProps={{ sx: { borderBottom: '1px solid rgba(224, 224, 224, 1)', '&:last-child td, &:last-child th': { border: 0 } } }}
-                        displayColumnDefOptions={{
-                            'mrt-row-actions': {
-                                header: 'Acciones',
-                                size: 150,
-                                minSize: 150,
-                            },
-                        }}
                         renderRowActions={({ row }) => (
                             <Box sx={{ display: 'flex', gap: '0.25rem' }}>
                                 <Tooltip title="Ver Detalles"><IconButton size="small" onClick={() => handleViewPatientDetails(row.original)}><VisibilityIcon /></IconButton></Tooltip>
@@ -410,7 +396,6 @@ const PatientsView = () => {
                                 )}
                             </Box>
                         )}
-                        enableColumnFilters={false}
                         enableGlobalFilter
                         initialState={{ showGlobalFilter: true }}
                         muiSearchTextFieldProps={{
@@ -457,15 +442,26 @@ const PatientsView = () => {
                         <Typography color="text.secondary" sx={{textAlign: 'center', my: 3}}>No hay registros en la historia clínica de este paciente.</Typography>
                     ) : (
                         <TableContainer component={Paper} variant="outlined">
-                            <Table size="small">
-                                <TableHead><TableRow><TableCell>Asunto</TableCell><TableCell>Fecha</TableCell><TableCell>Patología</TableCell><TableCell>Detalles</TableCell><TableCell align="center">Acciones</TableCell></TableRow></TableHead>
+                             <Table size="small">
+                                <TableHead><TableRow><TableCell>Asunto</TableCell><TableCell>Fecha</TableCell><TableCell>Patología</TableCell><TableCell>Adjunto</TableCell><TableCell align="center">Acciones</TableCell></TableRow></TableHead>
                                 <TableBody>
                                     {clinicalRecords.map(record => (
                                         <TableRow key={record.id}>
                                             <TableCell>{record.title || "Entrada General"}</TableCell>
                                             <TableCell>{record.entryDate && isValid(parseISO(record.entryDate)) ? format(parseISO(record.entryDate), "dd/MM/yyyy") : 'N/A'}</TableCell>
                                             <TableCell><Chip label={record.pathology || 'N/A'} size="small" color={record.pathology ? 'info' : 'default'} /></TableCell>
-                                            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.content}</TableCell>
+                                            <TableCell>
+                                                {record.attachmentPath && (
+                                                     <IconButton 
+                                                        size="small" 
+                                                        href={`${API_BASE_URL}/storage/${record.attachmentPath.split(/[\\/]/).pop()}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                     >
+                                                        <DownloadIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                )}
+                                            </TableCell>
                                             <TableCell align="center">
                                                 <Tooltip title="Ver Detalles"><IconButton onClick={() => handleOpenViewRecordModal(record)} size="small"><VisibilityIcon fontSize="inherit"/></IconButton></Tooltip>
                                                 <Tooltip title="Editar"><IconButton onClick={() => handleOpenRecordFormModal(record)} size="small"><EditIcon fontSize="inherit"/></IconButton></Tooltip>
@@ -479,14 +475,12 @@ const PatientsView = () => {
                     )}
                 </Paper>
             )}
-
+            
             <Dialog open={openAddPatientModal} onClose={handleCloseAddPatientModal} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Añadir Nuevo Paciente</DialogTitle>
                 <DialogContent sx={{ pt: 1 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-                        <Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>
-                            {getInitials(`${newPatientData.firstName} ${newPatientData.lastName}`)}
-                        </Avatar>
+                        <Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>{getInitials(`${newPatientData.firstName} ${newPatientData.lastName}`)}</Avatar>
                     </Box>
                     <Grid container spacing={2} direction="column">
                         <Grid item xs={12}><TextField autoFocus name="dni" label="DNI *" value={newPatientData.dni} onChange={handleNewPatientChange} fullWidth error={!!newPatientErrors.dni} helperText={newPatientErrors.dni} /></Grid>
@@ -494,114 +488,106 @@ const PatientsView = () => {
                         <Grid item xs={12}><TextField name="firstName" label="Nombre *" value={newPatientData.firstName} onChange={handleNewPatientChange} fullWidth error={!!newPatientErrors.firstName} helperText={newPatientErrors.firstName} /></Grid>
                         <Grid item xs={12}><TextField name="email" label="Correo Electrónico *" type="email" value={newPatientData.email} onChange={handleNewPatientChange} fullWidth error={!!newPatientErrors.email} helperText={newPatientErrors.email} /></Grid>
                         <Grid item xs={12}><TextField name="phone" label="Teléfono" value={newPatientData.phone} onChange={handleNewPatientChange} fullWidth /></Grid>
-                        <Grid item xs={12}>
-                             <DatePicker label="Fecha de Nacimiento" value={newPatientData.birthDate} onChange={handleNewPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/>
-                        </Grid>
+                        <Grid item xs={12}><DatePicker label="Fecha de Nacimiento" value={newPatientData.birthDate} onChange={handleNewPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/></Grid>
                     </Grid>
                      {newPatientErrors.form && <Alert severity="error" sx={{mt:2}}>{newPatientErrors.form}</Alert>}
                 </DialogContent>
-                <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}>
-                    <Button onClick={handleCloseAddPatientModal} color="inherit">Cancelar</Button>
-                    <Button onClick={handleSaveNewPatient} variant="contained">Guardar Paciente</Button>
-                </DialogActions>
+                <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}><Button onClick={handleCloseAddPatientModal} color="inherit">Cancelar</Button><Button onClick={handleSaveNewPatient} variant="contained">Guardar Paciente</Button></DialogActions>
             </Dialog>
 
             {editingPatientData && (
                 <Dialog open={openEditPatientModal} onClose={handleCloseEditPatientModal} maxWidth="xs" fullWidth>
                     <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Editar Datos del Paciente</DialogTitle>
                     <DialogContent sx={{ pt: 1 }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-                            <Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>
-                                {getInitials(`${editingPatientData.firstName} ${editingPatientData.lastName}`)}
-                            </Avatar>
-                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}><Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>{getInitials(`${editingPatientData.firstName} ${editingPatientData.lastName}`)}</Avatar></Box>
                         <Grid container spacing={2} direction="column">
                             <Grid item xs={12}><TextField name="dni" label="DNI *" value={editingPatientData.dni} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.dni} helperText={editingPatientErrors.dni}/></Grid>
                             <Grid item xs={12}><TextField autoFocus name="lastName" label="Apellido *" value={editingPatientData.lastName} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.lastName} helperText={editingPatientErrors.lastName}/></Grid>
                             <Grid item xs={12}><TextField name="firstName" label="Nombre *" value={editingPatientData.firstName} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.firstName} helperText={editingPatientErrors.firstName}/></Grid>
                             <Grid item xs={12}><TextField name="email" label="Correo Electrónico *" type="email" value={editingPatientData.email} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.email} helperText={editingPatientErrors.email}/></Grid>
                             <Grid item xs={12}><TextField name="phone" label="Teléfono" value={editingPatientData.phone} onChange={handleEditingPatientChange} fullWidth/></Grid>
-                            <Grid item xs={12}>
-                                 <DatePicker label="Fecha de Nacimiento" value={editingPatientData.birthDate} onChange={handleEditingPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/>
-                            </Grid>
+                            <Grid item xs={12}><DatePicker label="Fecha de Nacimiento" value={editingPatientData.birthDate} onChange={handleEditingPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/></Grid>
                         </Grid>
                         {editingPatientErrors.form && <Alert severity="error" sx={{mt:2}}>{editingPatientErrors.form}</Alert>}
                     </DialogContent>
-                    <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}>
-                        <Button onClick={handleCloseEditPatientModal} color="inherit">Cancelar</Button>
-                        <Button onClick={handleSaveEditedPatient} variant="contained">Guardar Cambios</Button>
-                    </DialogActions>
+                    <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}><Button onClick={handleCloseEditPatientModal} color="inherit">Cancelar</Button><Button onClick={handleSaveEditedPatient} variant="contained">Guardar Cambios</Button></DialogActions>
                 </Dialog>
             )}
 
             <Dialog open={openTogglePatientStatusConfirmModal} onClose={handleCloseTogglePatientStatusConfirmModal}>
                 <DialogTitle>Confirmar Cambio de Estado</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        ¿Está seguro de que desea **{patientToToggle?.isActive ? 'archivar' : 'reactivar'}** al paciente **{patientToToggle?.fullName}**?
-                        {patientToToggle?.isActive && " Un paciente archivado no aparecerá en las búsquedas para nuevos turnos."}
-                    </DialogContentText>
+                <DialogContent><DialogContentText>¿Está seguro de que desea **{patientToToggle?.isActive ? 'archivado' : 'reactivar'}** al paciente **{patientToToggle?.fullName}**?{patientToToggle?.isActive && " Un paciente archivado no aparecerá en las búsquedas para nuevos turnos."}</DialogContentText></DialogContent>
+                <DialogActions><Button onClick={handleCloseTogglePatientStatusConfirmModal}>Cancelar</Button><Button onClick={handleConfirmTogglePatientStatus} color={patientToToggle?.isActive ? "warning" : "success"}>{patientToToggle?.isActive ? 'Archivar' : 'Reactivar'}</Button></DialogActions>
+            </Dialog>
+
+             <Dialog open={openViewRecordModal} onClose={handleCloseViewRecordModal} maxWidth="md" fullWidth>
+                <DialogTitle>Detalle de Entrada de Historia Clínica</DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="h6" gutterBottom>{recordToView?.title || "Entrada sin título"}</Typography>
+                    <Typography variant="caption" display="block" color="text.secondary">Creado: {recordToView?.entryDate && isValid(parseISO(recordToView.entryDate)) ? format(parseISO(recordToView.entryDate), "PPPPp", { locale: es }) : 'N/A'}</Typography>
+                    {recordToView?.updatedAt && recordToView?.entryDate !== recordToView?.updatedAt && isValid(parseISO(recordToView.updatedAt)) && (<Typography variant="caption" display="block" color="text.secondary">Última Modificación: {format(parseISO(recordToView.updatedAt), "PPPPp", { locale: es })}</Typography>)}
+                    {recordToView?.pathology && (<Typography variant="subtitle1" sx={{mt:2, mb:1, color: 'info.main'}}>Patología Asociada: {recordToView.pathology}</Typography>)}
+                    <Typography variant="body1" sx={{mt:2, whiteSpace: 'pre-wrap'}}>{recordToView?.content}</Typography>
+                    {recordToView?.attachmentPath && (
+                        <Box mt={2}>
+                            <Typography variant="subtitle2" gutterBottom>Archivo Adjunto:</Typography>
+                            <Chip 
+                                icon={<AttachFileIcon />} 
+                                label={recordToView.attachmentName} 
+                                component="a" 
+                                href={`${API_BASE_URL}/storage/${recordToView.attachmentPath.split(/[\\/]/).pop()}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                clickable 
+                                variant="outlined"
+                            />
+                        </Box>
+                    )}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseTogglePatientStatusConfirmModal}>Cancelar</Button>
-                    <Button onClick={handleConfirmTogglePatientStatus} color={patientToToggle?.isActive ? "warning" : "success"}>
-                        {patientToToggle?.isActive ? 'Archivar' : 'Reactivar'}
+                <DialogActions sx={{p: '16px 24px'}}><Button onClick={handleCloseViewRecordModal}>Cerrar</Button></DialogActions>
+            </Dialog>
+
+            <Dialog open={openDeleteRecordConfirmModal} onClose={handleCloseDeleteRecordConfirmModal}>
+                <DialogTitle>Confirmar Eliminación de Registro de HC</DialogTitle>
+                <DialogContent><DialogContentText>¿Está seguro de que desea eliminar esta entrada de la historia clínica? Esta acción no se puede deshacer.</DialogContentText></DialogContent>
+                <DialogActions><Button onClick={handleCloseDeleteRecordConfirmModal}>Cancelar</Button><Button onClick={handleConfirmDeleteRecord} color="error">Eliminar</Button></DialogActions>
+            </Dialog>
+            
+            <Dialog open={openRecordFormModal} onClose={handleCloseRecordFormModal} maxWidth="md" fullWidth>
+                <DialogTitle>{isEditingRecordForm ? 'Editar Entrada de HC' : 'Nueva Entrada en Historia Clínica'}</DialogTitle>
+                <DialogContent>
+                    <Grid container spacing={2} direction="column" sx={{pt:1}}>
+                        <Grid item xs={12}><TextField autoFocus margin="dense" name="title" label="Motivo de la consulta/Asunto" type="text" fullWidth value={currentRecordForm.title} onChange={handleRecordInputChange}/></Grid>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth margin="dense">
+                                <InputLabel>Patología Asociada (Opcional)</InputLabel>
+                                <Select name="pathology" value={currentRecordForm.pathology} label="Patología Asociada (Opcional)" onChange={handleRecordInputChange}>
+                                    <MenuItem value=""><em>Ninguna</em></MenuItem>
+                                    {pathologies.map((pathology) => (
+                                        <MenuItem key={pathology.id} value={pathology.name}>{pathology.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12}><TextField margin="dense" name="content" label="Detalles *" type="text" fullWidth multiline rows={8} value={currentRecordForm.content} onChange={handleRecordInputChange} required /></Grid>
+                        <Grid item xs={12}>
+                            <Button variant="outlined" component="label" startIcon={<AttachFileIcon />} fullWidth sx={{textTransform: 'none', mt:1}}>
+                                {currentRecordForm.attachment ? 'Cambiar Archivo' : 'Adjuntar Archivo'}
+                                <input type="file" hidden onChange={handleAttachmentChange} accept=".pdf,.jpg,.jpeg,.png,.gif"/>
+                            </Button>
+                            <Typography variant="caption" display="block" sx={{mt:1, textAlign: 'center', color: 'text.secondary'}}>
+                                {currentRecordForm.attachment ? `Nuevo: ${currentRecordForm.attachment.name}` : (currentRecordForm.attachmentName || 'Ningún archivo seleccionado.')}
+                            </Typography>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{p: '16px 24px'}}>
+                    <Button onClick={handleCloseRecordFormModal} disabled={isSavingRecord}>Cancelar</Button>
+                    <Button onClick={handleSaveRecord} variant="contained" disabled={!currentRecordForm.content?.trim() || isSavingRecord}>
+                        {isSavingRecord ? <CircularProgress size={24} color="inherit" /> : (isEditingRecordForm ? 'Actualizar' : 'Guardar')}
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {selectedPatient && (
-                <>
-                    <Dialog open={openRecordFormModal} onClose={handleCloseRecordFormModal} maxWidth="md" fullWidth>
-                        <DialogTitle>{isEditingRecordForm ? 'Editar Entrada de HC' : 'Nueva Entrada en Historia Clínica'}</DialogTitle>
-                        <DialogContent>
-                            <Grid container spacing={2} direction="column" sx={{pt:1}}>
-                                <Grid item xs={12}><TextField autoFocus margin="dense" name="title" label="Motivo de la consulta/Asunto" type="text" fullWidth value={currentRecordForm.title} onChange={handleRecordInputChange}/></Grid>
-                                <Grid item xs={12}>
-                        <FormControl fullWidth margin="dense">
-                            <InputLabel>Patología Asociada (Opcional)</InputLabel>
-                                <Select name="pathology"  value={currentRecordForm.pathology} label="Patología Asociada (Opcional)" onChange={handleRecordInputChange}>
-                                <MenuItem value=""><em>Ninguna</em></MenuItem>
-                                {pathologies.map((pathology) => (
-                                <MenuItem key={pathology.id} value={pathology.name}>{pathology.name}</MenuItem>
-                                ))}
-                                </Select>
-                            </FormControl>
-                                </Grid>
-                                <Grid item xs={12}><TextField margin="dense" name="content" label="Detalles" type="text" fullWidth multiline rows={8} value={currentRecordForm.content} onChange={handleRecordInputChange} required /></Grid>
-                                <Grid item xs={12}><Button variant="outlined" component="label" startIcon={<AttachFileIcon />} fullWidth sx={{textTransform: 'none', mt:1}}>Adjuntar Archivo<input type="file" hidden onChange={handleAttachmentChange} accept="application/pdf,image/*"/></Button>{currentRecordForm.attachmentName && (<Typography variant="caption" display="block" sx={{mt:1, textAlign: 'center'}}>Seleccionado: {currentRecordForm.attachmentName}</Typography>)}</Grid>
-                            </Grid>
-                        </DialogContent>
-                        <DialogActions sx={{p: '16px 24px'}}><Button onClick={handleCloseRecordFormModal}>Cancelar</Button><Button onClick={handleSaveRecord} variant="contained" disabled={!currentRecordForm.content?.trim()}>{isEditingRecordForm ? 'Actualizar' : 'Guardar'}</Button></DialogActions>
-                    </Dialog>
-
-                    <Dialog open={openViewRecordModal} onClose={handleCloseViewRecordModal} maxWidth="md" fullWidth>
-                        <DialogTitle>Detalle de Entrada de Historia Clínica</DialogTitle>
-                        <DialogContent dividers>
-                            <Typography variant="h6" gutterBottom>{recordToView?.title || "Entrada sin título"}</Typography>
-                            <Typography variant="caption" display="block" color="text.secondary">
-                                Creado: {recordToView?.entryDate && isValid(parseISO(recordToView.entryDate)) ? format(parseISO(recordToView.entryDate), "PPPPp", { locale: es }) : 'N/A'}
-                            </Typography>
-                            {recordToView?.updatedAt && recordToView?.entryDate !== recordToView?.updatedAt && isValid(parseISO(recordToView.updatedAt)) && (<Typography variant="caption" display="block" color="text.secondary">Última Modificación: {format(parseISO(recordToView.updatedAt), "PPPPp", { locale: es })}</Typography>)}
-                            {recordToView?.pathology && (<Typography variant="subtitle1" sx={{mt:2, mb:1, color: 'info.main'}}>Patología Asociada: {recordToView.pathology}</Typography>)}
-                            <Typography variant="body1" sx={{mt:2, whiteSpace: 'pre-wrap'}}>{recordToView?.content}</Typography>
-                            {recordToView?.attachmentName && (<Box mt={2}><Typography variant="subtitle2" gutterBottom>Archivo Adjunto:</Typography><Chip icon={<AttachFileIcon />} label={recordToView.attachmentName} component="a" href="#" target="_blank" clickable variant="outlined"/></Box>)}
-                        </DialogContent>
-                        <DialogActions sx={{p: '16px 24px'}}><Button onClick={handleCloseViewRecordModal}>Cerrar</Button></DialogActions>
-                    </Dialog>
-
-                    <Dialog open={openDeleteRecordConfirmModal} onClose={handleCloseDeleteRecordConfirmModal}>
-                        <DialogTitle>Confirmar Eliminación de Registro de HC</DialogTitle>
-                        <DialogContent>
-                            <DialogContentText>¿Está seguro de que desea eliminar esta entrada de la historia clínica? Esta acción no se puede deshacer.</DialogContentText>
-                        </DialogContent>
-                        <DialogActions>
-                            <Button onClick={handleCloseDeleteRecordConfirmModal}>Cancelar</Button>
-                            <Button onClick={handleConfirmDeleteRecord} color="error">Eliminar</Button>
-                        </DialogActions>
-                    </Dialog>
-                </>
-            )}
         </LocalizationProvider>
     );
 };
