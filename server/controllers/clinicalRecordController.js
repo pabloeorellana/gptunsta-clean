@@ -1,4 +1,19 @@
+// En: server/controllers/clinicalRecordController.js
+
 import pool from '../config/db.js';
+
+// --- INICIO DE LA NUEVA FUNCIÓN ---
+// Esta función se activa después de que 'uploadClinicalAttachment' guardó el archivo.
+// Su único trabajo es devolver la ruta del archivo al frontend.
+export const uploadAttachment = (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No se subió ningún archivo.' });
+    }
+    // Devolvemos la ruta donde se guardó el archivo. El backend lo servirá desde aquí.
+    // La ruta será algo como '/data/clinical_attachments/nombre_del_archivo.pdf'
+    res.status(201).json({ filePath: req.file.path });
+};
+// --- FIN DE LA NUEVA FUNCIÓN ---
 
 export const getClinicalRecords = async (req, res) => {
     const { patientId } = req.params;
@@ -14,17 +29,19 @@ export const getClinicalRecords = async (req, res) => {
     }
 };
 
+// --- CAMBIOS EN addClinicalRecord ---
 export const addClinicalRecord = async (req, res) => {
     const { patientId } = req.params;
     const professionalUserId = req.user.userId;
-    const { title, content, pathology, attachmentName } = req.body;
+    // Ahora recibimos 'attachmentPath' y 'attachmentName' desde el frontend
+    const { title, content, pathology, attachmentPath, attachmentName } = req.body;
     if (!content) {
         return res.status(400).json({ message: 'El campo de detalles no puede estar vacío.' });
     }
     try {
         const [result] = await pool.query(
-            'INSERT INTO ClinicalRecords (patientId, professionalUserId, title, content, pathology, attachmentName) VALUES (?, ?, ?, ?, ?, ?)',
-            [patientId, professionalUserId, title || null, content, pathology || null, attachmentName || null]
+            'INSERT INTO ClinicalRecords (patientId, professionalUserId, title, content, pathology, attachmentPath, attachmentName) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [patientId, professionalUserId, title || null, content, pathology || null, attachmentPath || null, attachmentName || null]
         );
         const [newRecord] = await pool.query('SELECT * FROM ClinicalRecords WHERE id = ?', [result.insertId]);
         res.status(201).json(newRecord[0]);
@@ -34,16 +51,18 @@ export const addClinicalRecord = async (req, res) => {
     }
 };
 
+// --- CAMBIOS EN updateClinicalRecord ---
 export const updateClinicalRecord = async (req, res) => {
     const { recordId } = req.params;
-    const { title, content, pathology, attachmentName } = req.body;
+    // Ahora recibimos 'attachmentPath' y 'attachmentName' desde el frontend
+    const { title, content, pathology, attachmentPath, attachmentName } = req.body;
     if (!content) {
         return res.status(400).json({ message: 'El campo de detalles no puede estar vacío.' });
     }
     try {
         const [result] = await pool.query(
-            'UPDATE ClinicalRecords SET title = ?, content = ?, pathology = ?, attachmentName = ?, updatedAt = NOW() WHERE id = ?',
-            [title || null, content, pathology || null, attachmentName || null, recordId]
+            'UPDATE ClinicalRecords SET title = ?, content = ?, pathology = ?, attachmentPath = ?, attachmentName = ?, updatedAt = NOW() WHERE id = ?',
+            [title || null, content, pathology || null, attachmentPath || null, attachmentName || null, recordId]
         );
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Entrada de historia clínica no encontrada.' });

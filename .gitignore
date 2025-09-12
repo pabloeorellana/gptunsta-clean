@@ -3,6 +3,7 @@
 
 # Archivos de build y producción
 /build
+/local_storage/
 
 # Logs
 logs

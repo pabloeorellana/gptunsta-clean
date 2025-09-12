@@ -1,16 +1,22 @@
+// En: server/middleware/uploadMiddleware.js
+
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
-const storage = multer.diskStorage({
+// --- Middleware para Avatares (se mantiene igual) ---
+const avatarStorage = multer.diskStorage({
     destination(req, file, cb) {
-        cb(null, 'uploads/avatars/');
+        const uploadPath = 'uploads/avatars/';
+        fs.mkdirSync(uploadPath, { recursive: true });
+        cb(null, uploadPath);
     },
     filename(req, file, cb) {
         cb(null, `${req.user.userId}-${Date.now()}${path.extname(file.originalname)}`);
     }
 });
 
-function checkFileType(file, cb) {
+function checkImageType(file, cb) {
     const filetypes = /jpeg|jpg|png|gif/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
@@ -22,12 +28,51 @@ function checkFileType(file, cb) {
     }
 }
 
-const upload = multer({
-    storage,
+export const uploadAvatar = multer({
+    storage: avatarStorage,
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: function(req, file, cb) {
-        checkFileType(file, cb);
+        checkImageType(file, cb);
+    }
+}).single('profileImage');
+
+
+// --- SECCIÓN DE ADJUNTOS CLÍNICOS (MODIFICADA) ---
+
+const clinicalAttachmentStorage = multer.diskStorage({
+    destination(req, file, cb) {
+        // --- INICIO DE LA CORRECCIÓN ---
+        // 1. Lee la ruta base desde la variable de entorno 'STORAGE_PATH'.
+        // 2. Si no está definida, usa '/data' como valor por defecto (para producción).
+        const storageBasePath = process.env.STORAGE_PATH || '/data';
+        const uploadPath = path.join(storageBasePath, 'clinical_attachments');
+        // --- FIN DE LA CORRECCIÓN ---
+        
+        fs.mkdirSync(uploadPath, { recursive: true });
+        cb(null, uploadPath);
+    },
+    filename(req, file, cb) {
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        cb(null, `${req.user.userId}-${uniqueSuffix}${path.extname(file.originalname)}`);
     }
 });
 
-export const uploadAvatar = upload.single('profileImage');
+function checkAttachmentType(file, cb) {
+    const filetypes = /jpeg|jpg|png|gif|pdf/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+        return cb(null, true);
+    } else {
+        cb(new Error('Error: Solo se permiten archivos de imagen (jpg, png, gif) o PDF.'), false);
+    }
+}
+
+export const uploadClinicalAttachment = multer({
+    storage: clinicalAttachmentStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: function(req, file, cb) {
+        checkAttachmentType(file, cb);
+    }
+}).single('attachment');

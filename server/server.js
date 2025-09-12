@@ -65,6 +65,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Middleware para servir archivos estáticos de la carpeta 'uploads'
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Middleware para servir archivos del almacenamiento persistente de forma dinámica
+const storageBasePath = process.env.STORAGE_PATH || '/data';
+// Ahora, la ruta estática apunta directamente al subdirectorio de adjuntos clínicos
+const attachmentsPath = path.join(storageBasePath, 'clinical_attachments');
+app.use('/storage', express.static(attachmentsPath));
 
 // --- Montaje de Rutas de la API con Prefijos ---
 // Todas las rutas de tu API deben estar activas para que el backend funcione.
