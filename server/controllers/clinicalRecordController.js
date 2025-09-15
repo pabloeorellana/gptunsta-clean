@@ -1,8 +1,5 @@
-// En: server/controllers/clinicalRecordController.js
-
 import pool from '../config/db.js';
 
-// --- INICIO DE LA NUEVA FUNCIÓN ---
 // Esta función se activa después de que 'uploadClinicalAttachment' guardó el archivo.
 // Su único trabajo es devolver la ruta del archivo al frontend.
 export const uploadAttachment = (req, res) => {
@@ -13,7 +10,6 @@ export const uploadAttachment = (req, res) => {
     // La ruta será algo como '/data/clinical_attachments/nombre_del_archivo.pdf'
     res.status(201).json({ filePath: req.file.path });
 };
-// --- FIN DE LA NUEVA FUNCIÓN ---
 
 export const getClinicalRecords = async (req, res) => {
     const { patientId } = req.params;
@@ -29,11 +25,9 @@ export const getClinicalRecords = async (req, res) => {
     }
 };
 
-// --- CAMBIOS EN addClinicalRecord ---
 export const addClinicalRecord = async (req, res) => {
     const { patientId } = req.params;
     const professionalUserId = req.user.userId;
-    // Ahora recibimos 'attachmentPath' y 'attachmentName' desde el frontend
     const { title, content, pathology, attachmentPath, attachmentName } = req.body;
     if (!content) {
         return res.status(400).json({ message: 'El campo de detalles no puede estar vacío.' });
@@ -51,10 +45,8 @@ export const addClinicalRecord = async (req, res) => {
     }
 };
 
-// --- CAMBIOS EN updateClinicalRecord ---
 export const updateClinicalRecord = async (req, res) => {
     const { recordId } = req.params;
-    // Ahora recibimos 'attachmentPath' y 'attachmentName' desde el frontend
     const { title, content, pathology, attachmentPath, attachmentName } = req.body;
     if (!content) {
         return res.status(400).json({ message: 'El campo de detalles no puede estar vacío.' });

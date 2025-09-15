@@ -1,4 +1,3 @@
-// src/pages/AdminDashboardPage/views/CatalogManagementView.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Box, Typography, Button, Tooltip, IconButton, Dialog, DialogTitle,
@@ -14,7 +13,6 @@ import { useNotification } from '../../../context/NotificationContext';
 
 const initialItemState = { name: '', description: '' };
 
-// Componente genérico para gestionar un catálogo (Especialidades o Patologías)
 const CatalogManager = ({ catalogName, apiEndpoint }) => {
     const { showNotification } = useNotification();
     const [items, setItems] = useState([]);
@@ -24,7 +22,6 @@ const CatalogManager = ({ catalogName, apiEndpoint }) => {
     const [currentItem, setCurrentItem] = useState(initialItemState);
     const [validationErrors, setValidationErrors] = useState({});
 
-    // NUEVOS ESTADOS para el modal de confirmación de eliminación
     const [openDeleteConfirmModal, setOpenDeleteConfirmModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
 
@@ -86,7 +83,6 @@ const CatalogManager = ({ catalogName, apiEndpoint }) => {
         }
     };
     
-    // NUEVA LÓGICA DE ELIMINACIÓN
     const handleDeleteRequest = (row) => {
         setItemToDelete(row.original);
         setOpenDeleteConfirmModal(true);

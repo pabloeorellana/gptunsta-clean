@@ -8,7 +8,7 @@ const PatientForm = ({ selectedDateTime, onSubmit, onCancel, prefilledData, subm
         firstName: '',
         email: '',
         phone: '',
-        reasonForVisit: '', // Corregido de 'motivo' a 'reasonForVisit'
+        reasonForVisit: '',
     });
     const [errors, setErrors] = useState({});
 

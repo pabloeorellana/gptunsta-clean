@@ -1,4 +1,3 @@
-// src/pages/AdminDashboardPage/views/AdminAppointmentsView.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import authFetch from '../../../utils/authFetch';
 import {
@@ -150,7 +149,7 @@ const AdminAppointmentsView = () => {
                     datesSet={(viewInfo) => fetchAppointments(viewInfo)}
                     eventClick={handleEventClick}
                     editable={false}
-                    selectable={false} // Deshabilitar la selección de fechas para el admin
+                    selectable={false}
                     dayMaxEvents={true}
                     contentHeight="auto"
                     allDaySlot={false}

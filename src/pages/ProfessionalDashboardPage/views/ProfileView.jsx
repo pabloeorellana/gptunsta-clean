@@ -1,22 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// En: src/pages/ProfessionalDashboardPage/views/ProfileView.jsx
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import authFetch from '../../../utils/authFetch';
 import { useAuth } from '../../../context/AuthContext';
 import {
     Box, Typography, Paper, Grid, TextField, Button, CircularProgress,
     Alert, Avatar, Stack, Dialog, DialogTitle, DialogContent,
-    DialogActions, InputAdornment, IconButton
+    DialogActions, InputAdornment, IconButton, Badge
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { useNotification } from '../../../context/NotificationContext';
+import { API_BASE_URL } from '../../../config';
 
 const ProfileView = () => {
     const { showNotification } = useNotification();
     const { authUser, login: updateAuthContextUser, loadingAuth } = useAuth();
     const [profileData, setProfileData] = useState({
         dni: '', fullName: '', email: '', phone: '', specialty: '',
-        description: '',
+        description: '', profileImageUrl: '',
     });
     const [initialProfileData, setInitialProfileData] = useState({});
     const [loading, setLoading] = useState(true);
@@ -28,10 +32,12 @@ const ProfileView = () => {
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    const [selectedImageFile, setSelectedImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState('');
+    const fileInputRef = useRef(null);
+
     const handleClickShowPassword = () => setShowPassword((show) => !show);
-    const handleMouseDownPassword = (event) => {
-        event.preventDefault();
-    };
+    const handleMouseDownPassword = (event) => event.preventDefault();
 
     const fetchProfile = useCallback(async () => {
         if (loadingAuth || !authUser?.user?.id) {
@@ -54,9 +60,12 @@ const ProfileView = () => {
                 email: userData.email || '', phone: userData.phone || '',
                 specialty: professionalSpecificData.specialty || '',
                 description: professionalSpecificData.description || '',
+                profileImageUrl: userData.profileImageUrl || '',
             };
             setProfileData(dataToSet);
             setInitialProfileData(dataToSet);
+            // CORRECCIÓN: Asegura que la URL de previsualización se construya correctamente
+            setImagePreview(userData.profileImageUrl ? `${API_BASE_URL}${userData.profileImageUrl}` : '');
         } catch (err) {
             setError(err.message || "Error al cargar el perfil.");
         } finally {
@@ -73,15 +82,36 @@ const ProfileView = () => {
         setProfileData(prev => ({ ...prev, [name]: value }));
         setError('');
     };
+    
+    const handleImageChange = (event) => {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            setSelectedImageFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
+            setError('');
+        } else {
+            setSelectedImageFile(null);
+            showNotification('Por favor, seleccione un archivo de imagen válido (jpg, png, gif).', 'error');
+        }
+    };
+
+    const handleAvatarClick = () => {
+        if (isEditing) {
+            fileInputRef.current.click();
+        }
+    };
 
     const hasChanges = () => {
-        return JSON.stringify(profileData) !== JSON.stringify(initialProfileData);
+        return JSON.stringify(profileData) !== JSON.stringify(initialProfileData) || !!selectedImageFile;
     };
 
     const handleToggleEdit = () => {
         if (isEditing && hasChanges()) {
             if (window.confirm("Tiene cambios sin guardar. ¿Desea descartarlos?")) {
                 setProfileData(initialProfileData);
+                setSelectedImageFile(null);
+                setImagePreview(initialProfileData.profileImageUrl ? `${API_BASE_URL}${initialProfileData.profileImageUrl}` : '');
                 setError('');
                 setIsEditing(false);
             }
@@ -91,6 +121,7 @@ const ProfileView = () => {
         }
     };
 
+    // --- INICIO DE LA FUNCIÓN handleSubmit CORREGIDA Y SIMPLIFICADA ---
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!hasChanges()) {
@@ -99,35 +130,54 @@ const ProfileView = () => {
         }
         setLoading(true);
         setError('');
-        try {
-            const payload = {
-                fullName: profileData.fullName,
-                email: profileData.email,
-                phone: profileData.phone,
-            };
-            if (authUser?.user?.role === 'PROFESSIONAL') {
-                payload.specialty = profileData.specialty;
-                payload.description = profileData.description;
-            }
 
+        const formData = new FormData();
+        formData.append('fullName', profileData.fullName);
+        formData.append('email', profileData.email);
+        formData.append('phone', profileData.phone);
+        if (authUser?.user?.role === 'PROFESSIONAL') {
+            formData.append('specialty', profileData.specialty);
+            formData.append('description', profileData.description);
+        }
+        if (selectedImageFile) {
+            formData.append('profileImage', selectedImageFile);
+        }
+
+        try {
             const response = await authFetch('/api/users/me', {
                 method: 'PUT',
-                body: JSON.stringify(payload),
+                body: formData,
             });
 
-            await fetchProfile();
+            // La respuesta del backend ya contiene todos los datos actualizados, incluyendo la nueva URL de la imagen.
+            const updatedUserFromServer = response.user;
+
+            if (updatedUserFromServer && authUser && updateAuthContextUser) {
+                // 1. Actualizamos el AuthContext
+                const updatedUserForContext = { ...authUser.user, ...updatedUserFromServer };
+                updateAuthContextUser({ token: authUser.token, user: updatedUserForContext });
+                
+                // 2. Actualizamos el estado de ProfileView con esta única fuente de verdad
+                const dataToSet = {
+                    ...profileData, // Mantenemos datos como specialty y description
+                    ...updatedUserFromServer, // Sobrescribimos con los datos frescos del servidor
+                };
+                setProfileData(dataToSet);
+                setInitialProfileData(dataToSet); // Sincronizamos el estado inicial para 'hasChanges'
+                setImagePreview(updatedUserFromServer.profileImageUrl ? `${API_BASE_URL}${updatedUserFromServer.profileImageUrl}` : '');
+            }
+            
             showNotification('Perfil actualizado exitosamente', 'success');
             setIsEditing(false);
+            setSelectedImageFile(null);
 
-            if (response && response.user && authUser && updateAuthContextUser) {
-                updateAuthContextUser({ token: authUser.token, user: { ...authUser.user, ...response.user } });
-            }
         } catch (err) {
             showNotification(err.message || 'Error al actualizar el perfil', 'error');
         } finally {
             setLoading(false);
         }
     };
+    // --- FIN DE LA FUNCIÓN handleSubmit CORREGIDA ---
 
     const handleOpenPasswordModal = () => setOpenPasswordModal(true);
     const handleClosePasswordModal = () => {
@@ -181,18 +231,10 @@ const ProfileView = () => {
         return '?';
     };
 
-    if (loadingAuth) {
-        return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /><Typography sx={{ml: 2}}>Verificando autenticación...</Typography></Box>;
-    }
-    if (error) {
-        return <Alert severity="warning" sx={{ m: 2 }}>{error}</Alert>;
-    }
-    if (loading && !initialProfileData.dni) {
-         return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /><Typography sx={{ml: 2}}>Cargando perfil...</Typography></Box>;
-    }
-    if (!authUser && !loadingAuth) {
-        return <Alert severity="error" sx={{ m: 2 }}>Error de autenticación. Por favor, intente iniciar sesión de nuevo.</Alert>;
-    }
+    if (loadingAuth) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /><Typography sx={{ml: 2}}>Verificando autenticación...</Typography></Box>;
+    if (error) return <Alert severity="warning" sx={{ m: 2 }}>{error}</Alert>;
+    if (loading && !initialProfileData.dni) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><CircularProgress /><Typography sx={{ml: 2}}>Cargando perfil...</Typography></Box>;
+    if (!authUser && !loadingAuth) return <Alert severity="error" sx={{ m: 2 }}>Error de autenticación. Por favor, intente iniciar sesión de nuevo.</Alert>;
 
     return (
         <>
@@ -201,9 +243,20 @@ const ProfileView = () => {
                 <Box component="form" onSubmit={handleSubmit} noValidate>
                     <Grid container spacing={3} direction="column">
                         <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Avatar sx={{ width: 120, height: 120, mb: 1, fontSize: '3rem', bgcolor: 'primary.main' }}>
-                                {getInitials(profileData.fullName)}
-                            </Avatar>
+                            <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/png, image/jpeg, image/gif" hidden />
+                            <Badge
+                                overlap="circular"
+                                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                badgeContent={ isEditing ? ( <IconButton sx={{ backgroundColor: 'rgba(255,255,255,0.7)', '&:hover': {backgroundColor: 'white'} }} size="small" onClick={handleAvatarClick}><PhotoCamera color="primary" /></IconButton>) : null }
+                            >
+                                <Avatar
+                                    src={imagePreview}
+                                    sx={{ width: 120, height: 120, mb: 1, fontSize: '3rem', bgcolor: 'primary.main', cursor: isEditing ? 'pointer' : 'default', border: '2px solid', borderColor: 'primary.main' }}
+                                    onClick={handleAvatarClick}
+                                >
+                                    {!imagePreview && getInitials(profileData.fullName)}
+                                </Avatar>
+                            </Badge>
                         </Grid>
                         <Grid item xs={12}><TextField label="DNI" value={profileData.dni} fullWidth InputProps={{ readOnly: true }} variant="filled" helperText="El DNI no puede ser modificado."/></Grid>
                         <Grid item xs={12}><TextField required fullWidth name="fullName" label="Nombre Completo" value={profileData.fullName} onChange={handleChange} disabled={!isEditing || loading} variant={isEditing ? "outlined" : "filled"} InputProps={{ readOnly: !isEditing }}/></Grid>
@@ -231,13 +284,7 @@ const ProfileView = () => {
                             onChange={handlePasswordChange} error={!!passwordErrors.currentPassword}
                             helperText={passwordErrors.currentPassword} disabled={passwordLoading}
                             InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
+                                endAdornment: ( <InputAdornment position="end"> <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>),
                             }}
                         />
                         <TextField
@@ -246,13 +293,7 @@ const ProfileView = () => {
                             onChange={handlePasswordChange} error={!!passwordErrors.newPassword}
                             helperText={passwordErrors.newPassword} disabled={passwordLoading}
                             InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
+                                endAdornment: ( <InputAdornment position="end"> <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>),
                             }}
                         />
                         <TextField
@@ -261,13 +302,7 @@ const ProfileView = () => {
                             onChange={handlePasswordChange} error={!!passwordErrors.confirmNewPassword}
                             helperText={passwordErrors.confirmNewPassword} disabled={passwordLoading}
                             InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
+                                endAdornment: ( <InputAdornment position="end"> <IconButton aria-label="toggle password visibility" onClick={handleClickShowPassword} onMouseDown={handleMouseDownPassword} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>),
                             }}
                         />
                     </Box>

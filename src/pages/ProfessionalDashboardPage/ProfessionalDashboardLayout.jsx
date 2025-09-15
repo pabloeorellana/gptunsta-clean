@@ -1,5 +1,3 @@
-// En: src/pages/ProfessionalDashboardPage/ProfessionalDashboardLayout.jsx
-
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link as RouterLink, Navigate, useNavigate } from 'react-router-dom';
 import {
@@ -19,8 +17,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useAuth } from '../../context/AuthContext';
 import authFetch from '../../utils/authFetch';
-import { DateTime } from 'luxon'; // <-- CAMBIO: Importamos Luxon
-// --- CAMBIO: Eliminamos las importaciones de date-fns ---
+import { DateTime } from 'luxon'; 
 
 import AppointmentsView from './views/AppointmentsView.jsx';
 import AvailabilityView from './views/AvailabilityView.jsx';
@@ -225,7 +222,6 @@ const ProfessionalDashboardLayout = (props) => {
                                         <ListItemIcon><EventAvailableIcon fontSize="small" color={notification.isRead ? 'inherit' : 'primary'} /></ListItemIcon>
                                         <ListItemText
                                             primary={notification.message}
-                                            // --- CAMBIO: Usamos Luxon para el formato de fecha relativa ---
                                             secondary={DateTime.fromISO(notification.createdAt).setLocale('es').toRelative()}
                                             primaryTypographyProps={{ style: { fontWeight: notification.isRead ? 400 : 600, whiteSpace: 'normal' } }}
                                         />

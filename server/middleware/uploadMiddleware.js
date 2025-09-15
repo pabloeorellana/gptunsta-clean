@@ -1,10 +1,7 @@
-// En: server/middleware/uploadMiddleware.js
-
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// --- Middleware para Avatares (se mantiene igual) ---
 const avatarStorage = multer.diskStorage({
     destination(req, file, cb) {
         const uploadPath = 'uploads/avatars/';
@@ -36,17 +33,10 @@ export const uploadAvatar = multer({
     }
 }).single('profileImage');
 
-
-// --- SECCIÓN DE ADJUNTOS CLÍNICOS (MODIFICADA) ---
-
 const clinicalAttachmentStorage = multer.diskStorage({
     destination(req, file, cb) {
-        // --- INICIO DE LA CORRECCIÓN ---
-        // 1. Lee la ruta base desde la variable de entorno 'STORAGE_PATH'.
-        // 2. Si no está definida, usa '/data' como valor por defecto (para producción).
         const storageBasePath = process.env.STORAGE_PATH || '/data';
         const uploadPath = path.join(storageBasePath, 'clinical_attachments');
-        // --- FIN DE LA CORRECCIÓN ---
         
         fs.mkdirSync(uploadPath, { recursive: true });
         cb(null, uploadPath);

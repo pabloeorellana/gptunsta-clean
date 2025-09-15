@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { DateTime } from 'luxon'; // Usamos Luxon en lugar de date-fns
+import { DateTime } from 'luxon';
 import { sendAppointmentConfirmationEmail } from '../utils/emailService.js';
 import pool from '../config/db.js';
 
@@ -225,16 +225,13 @@ export const createPublicAppointment = async (req, res) => {
          if (professionalData.length > 0) {
             const professional = professionalData[0];
             
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Corregimos el orden de los argumentos para que coincida con la definición de la función
             await sendAppointmentConfirmationEmail(
-                email,                      // 1. patientEmail
-                fullName,                   // 2. patientName
-                professional.fullName,      // 3. professionalName (antes estaba dateTime)
-                DateTime.fromISO(dateTime).toJSDate(), // 4. dateTime (antes estaba professional.fullName)
-                reasonForVisit              // 5. reasonForVisit (antes estaba professional.email)
+                email,
+                fullName,
+                professional.fullName,
+                DateTime.fromISO(dateTime).toJSDate(), 
+                reasonForVisit
             );
-            // --- FIN DE LA CORRECCIÓN ---
          }
 
          const notificationMessage = `Nuevo turno de ${fullName} para el ${DateTime.fromISO(dateTime).setZone('America/Argentina/Buenos_Aires').toFormat("dd/MM 'a las' HH:mm", { locale: 'es' })}.`;

@@ -1,4 +1,3 @@
-// src/pages/AdminDashboardPage/views/UserManagementView.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Box, Typography, Button, Tooltip, IconButton, Dialog, DialogTitle,
@@ -30,10 +29,6 @@ const UserManagementView = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // Eliminamos el estado de 'specialties'
-    // const [specialties, setSpecialties] = useState([]);
-
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentUser, setCurrentUser] = useState(initialUserState);
@@ -48,7 +43,6 @@ const UserManagementView = () => {
     const [openDeleteConfirmModal, setOpenDeleteConfirmModal] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
 
-    // Simplificamos la función para que solo cargue usuarios
     const fetchUsers = useCallback(async () => {
         setLoading(true);
         setError('');
@@ -260,8 +254,6 @@ const UserManagementView = () => {
                                 </IconButton>
                             </Tooltip>
                         )}
-                        {/* --- (AÑADIDO) Botón de eliminación permanente --- */}
-                        {/* Solo mostramos el botón si el usuario no es el admin logueado */}
                         {authUser.user.id !== row.original.id && (
                              <Tooltip title="Eliminar Permanentemente">
                                 <IconButton color="error" onClick={() => handleDeleteUserRequest(row.original)}>
@@ -277,7 +269,6 @@ const UserManagementView = () => {
                     </Button>
                 )}
             />
-            {/* --- (AÑADIDO) Modal de confirmación para eliminación permanente --- */}
             <Dialog open={openDeleteConfirmModal} onClose={() => setOpenDeleteConfirmModal(false)}>
                 <DialogTitle sx={{color: 'error.main'}}>Confirmar Eliminación Permanente</DialogTitle>
                 <DialogContent>

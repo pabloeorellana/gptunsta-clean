@@ -1,4 +1,3 @@
-// src/pages/AdminDashboardPage/views/AdminPatientsView.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import authFetch from '../../../utils/authFetch';
 import {
@@ -259,7 +258,7 @@ const AdminPatientsView = () => {
                     enableRowActions
                     positionActionsColumn="last"
                     enableColumnResizing
-                    layoutMode="grid" // Opcional: mejora el comportamiento del redimensionamiento
+                    layoutMode="grid"
                     muiTablePaperProps={{ elevation: 0 }}
                     muiTableHeadCellProps={{ sx: { fontWeight: 'normal', color: 'text.secondary', borderBottom: '1px solid rgba(224, 224, 224, 1)' } }}
                     muiTableBodyCellProps={{ sx: { padding: '12px 16px', border: 'none' } }}
@@ -267,8 +266,8 @@ const AdminPatientsView = () => {
                     displayColumnDefOptions={{
                         'mrt-row-actions': {
                             header: 'Acciones',
-                            size: 160, // Ajustar el tamaño por defecto de la columna de acciones
-                            minSize: 160, // <-- CORRECCIÓN CLAVE
+                            size: 160, 
+                            minSize: 160, 
                         },
                     }}
                     renderRowActions={({ row }) => (

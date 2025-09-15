@@ -1,7 +1,4 @@
-// En: src/pages/AppointmentBookingPage/AppointmentBookingPage.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
-// --- CAMBIO: Eliminamos las importaciones de date-fns y date-fns-tz ---
 import {
     Container, Typography, Box, CssBaseline, AppBar, Toolbar, Alert, TextField,
     Button, CircularProgress, Paper, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -150,13 +147,9 @@ const AppointmentBookingPage = () => {
         setIsSubmitting(true);
         setSubmissionError('');
         try {
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Usamos el método nativo .toISOString() en el objeto Date.
-            // Esto envía una fecha universal estándar (ej: "2025-09-15T13:00:00.000Z")
-            // que el backend con Luxon puede interpretar sin problemas.
             const payload = {
                 professionalUserId: selectedProfessionalId,
-                dateTime: appointmentDateTime.toISOString(), // <-- ESTA ES LA LÍNEA CLAVE
+                dateTime: appointmentDateTime.toISOString(),
                 dni: patientDetails.dni,
                 firstName: patientDetails.firstName,
                 lastName: patientDetails.lastName,
@@ -164,7 +157,6 @@ const AppointmentBookingPage = () => {
                 phone: patientDetails.phone,
                 reasonForVisit: patientDetails.reasonForVisit
             };
-            // --- FIN DE LA CORRECCIÓN ---
             
             const response = await fetch(`${API_BASE_URL}/api/public/appointments`, {
                 method: 'POST',

@@ -1,4 +1,3 @@
-// src/pages/AdminDashboardPage/views/AdminStatisticsView.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Box, Typography, Paper, Grid, Button, CircularProgress, Stack, Divider,

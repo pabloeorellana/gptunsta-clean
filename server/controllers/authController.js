@@ -36,7 +36,8 @@ export const loginUser = async (req, res) => {
                 dni: user.dni,
                 fullName: user.fullName,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                profileImageUrl: user.profileImageUrl
             }
         });
     } catch (error) {
@@ -55,21 +56,13 @@ export const forgotPassword = async (req, res) => {
         const [users] = await pool.query('SELECT * FROM Users WHERE email = ? AND isActive = TRUE', [email]);
 
         if (users.length === 0) {
-            // ¡Importante por seguridad! No revelamos si el email existe o no.
-            // Siempre enviamos una respuesta exitosa.
             return res.json({ message: 'Si existe una cuenta con ese correo, se ha enviado un enlace de restablecimiento.' });
         }
         
         const user = users[0];
-
-        // Generar un token aleatorio y seguro
         const resetToken = crypto.randomBytes(32).toString('hex');
-        
-        // Hashear el token antes de guardarlo en la DB
         const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-        
-        // Establecer la fecha de expiración (ej. 1 hora)
-        const expirationDate = new Date(Date.now() + 3600000); // 1 hora en milisegundos
+        const expirationDate = new Date(Date.now() + 3600000);
 
         await pool.query(
             'UPDATE Users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE id = ?',
@@ -83,13 +76,10 @@ export const forgotPassword = async (req, res) => {
 
     } catch (error) {
         console.error('Error en forgotPassword:', error);
-        // En caso de un error grave, podemos devolver un error de servidor,
-        // pero evitamos dar detalles sobre el usuario.
         res.status(500).json({ message: 'Error del servidor al procesar la solicitud.' });
     }
 };
 
-// --- AÑADIR NUEVA FUNCIÓN: resetPassword ---
 export const resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
@@ -98,7 +88,6 @@ export const resetPassword = async (req, res) => {
         return res.status(400).json({ message: 'La contraseña es requerida y debe tener al menos 6 caracteres.' });
     }
 
-    // Hashear el token recibido para compararlo con el de la DB
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     try {
@@ -112,12 +101,9 @@ export const resetPassword = async (req, res) => {
         }
 
         const user = users[0];
-
-        // Hashear la nueva contraseña
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // Actualizar la contraseña e invalidar el token
         await pool.query(
             'UPDATE Users SET passwordHash = ?, resetPasswordToken = NULL, resetPasswordExpires = NULL WHERE id = ?',
             [passwordHash, user.id]

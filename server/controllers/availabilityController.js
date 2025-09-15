@@ -1,4 +1,4 @@
-import { DateTime } from 'luxon'; // Usaremos Luxon para todo el manejo de fechas
+import { DateTime } from 'luxon';
 import pool from '../config/db.js';
 
 export const getRegularSchedules = async (req, res) => {
@@ -141,7 +141,7 @@ export const removeTimeBlock = async (req, res) => {
 };
 
 export const getAvailability = async (req, res) => {
-    const { date, professionalId } = req.query; // date es 'yyyy-MM-dd'
+    const { date, professionalId } = req.query;
     if (!date || !professionalId) {
         return res.status(400).json({ message: "Se requiere fecha y ID del profesional." });
     }
@@ -149,7 +149,7 @@ export const getAvailability = async (req, res) => {
     try {
         const timeZone = 'America/Argentina/Buenos_Aires';
         const requestedDateLuxon = DateTime.fromISO(date, { zone: timeZone });
-        const dayOfWeek = requestedDateLuxon.weekday; // Luxon: Lunes=1, Domingo=7. Ajustamos la consulta.
+        const dayOfWeek = requestedDateLuxon.weekday;
 
         const [schedules] = await pool.query(
             'SELECT startTime, endTime, slotDurationMinutes FROM ProfessionalAvailability WHERE professionalUserId = ? AND dayOfWeek = ?',

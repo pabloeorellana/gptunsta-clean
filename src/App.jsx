@@ -5,8 +5,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Typography from '@mui/material/Typography';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
-
-// --- (AÑADIDO) Importamos la nueva Landing Page ---
 import LandingPage from './pages/LandingPage/LandingPage.jsx';
 
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage.jsx';
@@ -31,24 +29,17 @@ const theme = createTheme({
     },
 });
 
-// Componente para Proteger Rutas de Profesional y Admin
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const { authUser, isAuthenticated, loadingAuth } = useAuth();
 
     if (loadingAuth) {
-        // Muestra un loader mientras se verifica la autenticación inicial
         return <Typography sx={{ p: 3, textAlign: 'center' }}>Verificando autenticación...</Typography>;
     }
 
     if (!isAuthenticated) {
-        // Si no está autenticado, redirige a la página de login
         return <Navigate to="/profesional/login" replace />;
     }
-
-    // Si la ruta requiere roles específicos y el rol del usuario no está permitido
     if (allowedRoles && !allowedRoles.includes(authUser.user.role)) {
-        // Redirige a una página de "no autorizado" o de vuelta a la agenda del profesional como fallback
-        // Esto previene que un 'PROFESSIONAL' acceda a '/admin/dashboard'
         return <Navigate to="/profesional/dashboard/agenda" replace />;
     }
 
@@ -63,21 +54,12 @@ function App() {
                 <NotificationProvider>
                     <AuthProvider>
                         <Routes>
-                            {/* --- Ruta Principal --- */}
-                            {/* Ahora la ruta raíz '/' muestra la nueva LandingPage. */}
                             <Route path="/" element={<LandingPage />} />
-
-                            {/* --- Rutas Públicas para Pacientes --- */}
-                            {/* La ruta para reservar turnos ahora es explícitamente '/reservar-turno'. */}
                             <Route path="/reservar-turno" element={<AppointmentBookingPage />} />
                             <Route path="/reservar-turno/:professionalId" element={<AppointmentBookingPage />} />
-                            
-                            {/* --- Rutas de Autenticación y Recuperación --- */}
                             <Route path="/profesional/login" element={<ProfessionalLoginPage />} />                
                             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-
-                            {/* --- Rutas Protegidas para Profesionales --- */}
                             <Route
                                 path="/profesional/dashboard/*"
                                 element={
@@ -86,8 +68,6 @@ function App() {
                                     </ProtectedRoute>
                                 }
                             />
-
-                            {/* --- Rutas Protegidas para Administradores --- */}
                             <Route
                                 path="/admin/dashboard/*"
                                 element={
@@ -96,8 +76,6 @@ function App() {
                                     </ProtectedRoute>
                                 }
                             />
-
-                            {/* --- Ruta para Página No Encontrada (404) --- */}
                             <Route path="*" element={<Typography sx={{p:3, textAlign:'center'}}><h2>404</h2><p>Página no encontrada</p></Typography>} />
                         </Routes>
                     </AuthProvider>

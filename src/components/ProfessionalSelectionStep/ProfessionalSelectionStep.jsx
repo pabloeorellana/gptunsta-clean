@@ -22,7 +22,6 @@ const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfession
                 const data = await response.json();
                 setProfessionals(data);
 
-                // Si viene un ID preseleccionado de la URL, lo seleccionamos automáticamente
                 if (preSelectedProfessionalId) {
                     const foundProf = data.find(p => p.id === preSelectedProfessionalId);
                     if (foundProf) {
@@ -39,8 +38,7 @@ const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfession
             }
         };
         fetchProfessionals();
-    }, [onSelectProfessional, preSelectedProfessionalId]); // Ejecutar solo si el ID preseleccionado cambia
-
+    }, [onSelectProfessional, preSelectedProfessionalId]);
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>

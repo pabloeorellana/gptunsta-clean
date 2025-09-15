@@ -1,5 +1,3 @@
-// En: src/pages/ProfessionalDashboardPage/views/PatientsView.jsx
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import authFetch from '../../../utils/authFetch';
 import {
@@ -166,7 +164,7 @@ const PatientsView = () => {
                 content: currentRecordForm.content,
                 pathology: currentRecordForm.pathology,
                 attachmentName: currentRecordForm.attachment ? currentRecordForm.attachment.name : currentRecordForm.attachmentName,
-                attachmentPath: uploadedFilePath.replace(/\\/g, '/'), // Normalizamos la ruta por si acaso
+                attachmentPath: uploadedFilePath.replace(/\\/g, '/'), 
             };
     
             if (isEditingRecordForm) {
