@@ -162,7 +162,7 @@ const LandingPage = () => {
                                     </List>
                                 </Box>
                                 <Box sx={{ width: { xs: '100%', md: '50%' }, pr: { xs: 0, md: 3 } }}>
-                                    <Box component="img" src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max" alt="Orientación vocacional" sx={{ width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '12px', boxShadow: 3 }} />
+                                    <Box component="img" src="https://www.unsta.edu.ar/wp-content/uploads/2023/08/JORNADA-DE-NUTRICION_web-1536x852.jpg" alt="Orientación vocacional" sx={{ width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '12px', boxShadow: 3 }} />
                                 </Box>
                             </Box>
                         </AnimatedSection>

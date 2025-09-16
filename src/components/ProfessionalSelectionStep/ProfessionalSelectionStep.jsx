@@ -5,6 +5,18 @@ import {
 } from '@mui/material';
 import { API_BASE_URL } from '../../config';
 
+const getInitials = (name) => {
+    if (!name) return '?';
+    const nameParts = name.trim().split(' ');
+    if (nameParts.length > 1 && nameParts[0] && nameParts[nameParts.length - 1]) {
+        return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+    }
+    if (nameParts[0]) {
+        return name.substring(0, 2).toUpperCase();
+    }
+    return '?';
+};
+
 const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfessionalId }) => {
     const [professionals, setProfessionals] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -39,6 +51,7 @@ const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfession
         };
         fetchProfessionals();
     }, [onSelectProfessional, preSelectedProfessionalId]);
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
@@ -69,7 +82,20 @@ const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfession
                     <Grid item key={prof.id} xs={12} sm={6} md={4}>
                         <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                             <CardContent sx={{ flexGrow: 1, textAlign: 'center' }}>
-                                <Avatar src={prof.profileImageUrl} alt={prof.fullName} sx={{ width: 80, height: 80, margin: 'auto', mb: 2 }} />
+                                {/* --- INICIO DE LA CORRECCIÓN FINAL --- */}
+                                <Avatar 
+                                    // La lógica es: si prof.profileImageUrl existe (no es null ni undefined),
+                                    // construye la URL completa. De lo contrario, no pases ningún 'src'.
+                                    src={prof.profileImageUrl ? `${API_BASE_URL}${prof.profileImageUrl}` : undefined} 
+                                    alt={prof.fullName} 
+                                    sx={{ width: 80, height: 80, margin: 'auto', mb: 2, fontSize: '2.5rem', bgcolor: 'secondary.main' }}
+                                >
+                                    {/* El componente Avatar de MUI es inteligente: si 'src' está vacío o falla,
+                                        automáticamente mostrará a sus "hijos" (children).
+                                        Por eso, ponemos las iniciales aquí como fallback. */}
+                                    {!prof.profileImageUrl && getInitials(prof.fullName)}
+                                </Avatar>
+                                {/* --- FIN DE LA CORRECCIÓN FINAL --- */}
                                 <Typography gutterBottom variant="h5" component="h2">{prof.fullName}</Typography>
                                 <Typography color="primary" sx={{mb:1}}>{prof.specialty}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{prof.description || 'Sin descripción.'}</Typography>

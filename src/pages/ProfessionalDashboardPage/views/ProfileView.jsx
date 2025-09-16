@@ -1,5 +1,3 @@
-// En: src/pages/ProfessionalDashboardPage/views/ProfileView.jsx
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import authFetch from '../../../utils/authFetch';
 import { useAuth } from '../../../context/AuthContext';
@@ -64,7 +62,6 @@ const ProfileView = () => {
             };
             setProfileData(dataToSet);
             setInitialProfileData(dataToSet);
-            // CORRECCIÓN: Asegura que la URL de previsualización se construya correctamente
             setImagePreview(userData.profileImageUrl ? `${API_BASE_URL}${userData.profileImageUrl}` : '');
         } catch (err) {
             setError(err.message || "Error al cargar el perfil.");
@@ -121,7 +118,6 @@ const ProfileView = () => {
         }
     };
 
-    // --- INICIO DE LA FUNCIÓN handleSubmit CORREGIDA Y SIMPLIFICADA ---
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!hasChanges()) {
@@ -149,21 +145,15 @@ const ProfileView = () => {
                 body: formData,
             });
 
-            // La respuesta del backend ya contiene todos los datos actualizados, incluyendo la nueva URL de la imagen.
             const updatedUserFromServer = response.user;
 
             if (updatedUserFromServer && authUser && updateAuthContextUser) {
-                // 1. Actualizamos el AuthContext
                 const updatedUserForContext = { ...authUser.user, ...updatedUserFromServer };
                 updateAuthContextUser({ token: authUser.token, user: updatedUserForContext });
                 
-                // 2. Actualizamos el estado de ProfileView con esta única fuente de verdad
-                const dataToSet = {
-                    ...profileData, // Mantenemos datos como specialty y description
-                    ...updatedUserFromServer, // Sobrescribimos con los datos frescos del servidor
-                };
+                const dataToSet = { ...profileData, ...updatedUserFromServer };
                 setProfileData(dataToSet);
-                setInitialProfileData(dataToSet); // Sincronizamos el estado inicial para 'hasChanges'
+                setInitialProfileData(dataToSet);
                 setImagePreview(updatedUserFromServer.profileImageUrl ? `${API_BASE_URL}${updatedUserFromServer.profileImageUrl}` : '');
             }
             
@@ -173,11 +163,12 @@ const ProfileView = () => {
 
         } catch (err) {
             showNotification(err.message || 'Error al actualizar el perfil', 'error');
+            // Si falla, volvemos a cargar los datos originales para evitar inconsistencias
+            fetchProfile();
         } finally {
             setLoading(false);
         }
     };
-    // --- FIN DE LA FUNCIÓN handleSubmit CORREGIDA ---
 
     const handleOpenPasswordModal = () => setOpenPasswordModal(true);
     const handleClosePasswordModal = () => {
