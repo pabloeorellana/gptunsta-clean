@@ -64,7 +64,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Middleware para servir archivos estáticos de la carpeta 'uploads'
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Middleware para servir archivos del almacenamiento persistente de forma dinámica
 const storageBasePath = process.env.STORAGE_PATH || '/data';
 // Ahora, la ruta estática apunta directamente al subdirectorio de adjuntos clínicos
