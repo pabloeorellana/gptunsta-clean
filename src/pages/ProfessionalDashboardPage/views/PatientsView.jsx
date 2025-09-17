@@ -1,3 +1,5 @@
+// En: src/pages/ProfessionalDashboardPage/views/PatientsView.jsx
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import authFetch from '../../../utils/authFetch';
 import {
@@ -142,6 +144,7 @@ const PatientsView = () => {
     const handleSaveRecord = async () => {
         setIsSavingRecord(true);
         let uploadedFilePath = currentRecordForm.attachmentPath || '';
+        let uploadedFileName = currentRecordForm.attachmentName || '';
     
         try {
             if (currentRecordForm.attachment) {
@@ -157,13 +160,14 @@ const PatientsView = () => {
                     throw new Error("La subida del archivo falló, no se recibió la ruta.");
                 }
                 uploadedFilePath = uploadResponse.filePath;
+                uploadedFileName = currentRecordForm.attachment.name;
             }
     
             const recordPayload = {
                 title: currentRecordForm.title,
                 content: currentRecordForm.content,
                 pathology: currentRecordForm.pathology,
-                attachmentName: currentRecordForm.attachment ? currentRecordForm.attachment.name : currentRecordForm.attachmentName,
+                attachmentName: uploadedFileName,
                 attachmentPath: uploadedFilePath.replace(/\\/g, '/'), 
             };
     
@@ -194,7 +198,7 @@ const PatientsView = () => {
     const handleBackToList = () => setSelectedPatient(null);
     const handleOpenRecordFormModal = (recordToEdit = null) => {
         if (recordToEdit) {
-            setCurrentRecordForm({ ...initialClinicalRecordState, ...recordToEdit });
+            setCurrentRecordForm({ ...initialClinicalRecordState, ...recordToEdit, attachment: null });
             setIsEditingRecordForm(true);
         } else {
             setCurrentRecordForm(initialClinicalRecordState);
@@ -223,7 +227,7 @@ const PatientsView = () => {
         if (recordToDeleteId) {
             try {
                 await authFetch(`/api/clinical-records/${recordToDeleteId}`, { method: 'DELETE' });
-                setClinicalRecords(prev => prev.filter(r => r.id !== recordToDeleteId));
+                fetchClinicalRecords(selectedPatient.id);
                 showNotification('Registro de historia clínica eliminado correctamente.', 'success');
             } catch (err) {
                 showNotification(err.message || `Error eliminando la entrada.`, 'error');
@@ -267,6 +271,20 @@ const PatientsView = () => {
             showNotification(err.message || `Error al añadir el paciente.`, 'error');
         }
     };
+    
+    // --- ESTA ES LA FUNCIÓN QUE SE USA PERO NO TENÍA SU MODAL ---
+    const handleEditPatient = (patient) => {
+        setPatientForValidation(patient);
+        setEditingPatientData({
+            id: patient.id, dni: patient.dni, lastName: patient.lastName || '',
+            firstName: patient.firstName || '', email: patient.email,
+            phone: patient.phone || '',
+            birthDate: patient.birthDate ? parseISO(patient.birthDate) : null,
+        });
+        setEditingPatientErrors({});
+        setOpenEditPatientModal(true);
+    };
+
     const handleCloseEditPatientModal = () => {
         setOpenEditPatientModal(false);
         setEditingPatientData(null);
@@ -298,7 +316,7 @@ const PatientsView = () => {
         try {
             const updatedPatientPayload = { ...editingPatientData, birthDate: editingPatientData.birthDate ? format(editingPatientData.birthDate, 'yyyy-MM-dd') : null };
             const updatedPatient = await authFetch(`/api/patients/${editingPatientData.id}`, { method: 'PUT', body: JSON.stringify(updatedPatientPayload) });
-            await fetchInitialData();
+            fetchInitialData();
             if (selectedPatient) {
                 const patientWithFullName = { ...updatedPatient, fullName: `${updatedPatient.firstName || ''} ${updatedPatient.lastName || ''}`.trim() };
                 setSelectedPatient(patientWithFullName);
@@ -355,8 +373,7 @@ const PatientsView = () => {
                         <Typography variant="h5" gutterBottom component="div" sx={{m:0}}>Mis Pacientes</Typography>
                         <Stack direction="row" spacing={2} alignItems="center">
                             <ToggleButtonGroup
-                                value={showArchived}
-                                exclusive
+                                value={showArchived} exclusive
                                 onChange={(e, newValue) => { if(newValue !== null) setShowArchived(newValue); }}
                                 size="small"
                             >
@@ -367,40 +384,26 @@ const PatientsView = () => {
                         </Stack>
                     </Stack>
                     <MaterialReactTable
-                        columns={patientTableColumns}
-                        data={filteredPatientsForTable}
-                        localization={MRT_Localization_ES}
-                        enableRowActions
-                        positionActionsColumn="last"
-                        enableColumnResizing
-                        layoutMode="grid"
+                        columns={patientTableColumns} data={filteredPatientsForTable}
+                        localization={MRT_Localization_ES} enableRowActions
+                        positionActionsColumn="last" enableColumnResizing layoutMode="grid"
                         muiTablePaperProps={{ elevation: 0 }}
                         renderRowActions={({ row }) => (
                             <Box sx={{ display: 'flex', gap: '0.25rem' }}>
                                 <Tooltip title="Ver Detalles"><IconButton size="small" onClick={() => handleViewPatientDetails(row.original)}><VisibilityIcon /></IconButton></Tooltip>
                                 <Tooltip title="Editar Paciente"><IconButton size="small" onClick={() => handleEditPatient(row.original)}><EditIcon /></IconButton></Tooltip>
                                 {row.original.isActive ? (
-                                    <Tooltip title="Archivar Paciente">
-                                        <IconButton size="small" color="warning" onClick={() => handleTogglePatientStatusRequest(row.original)}>
-                                            <ArchiveIcon />
-                                        </IconButton>
-                                    </Tooltip>
+                                    <Tooltip title="Archivar Paciente"><IconButton size="small" color="warning" onClick={() => handleTogglePatientStatusRequest(row.original)}><ArchiveIcon /></IconButton></Tooltip>
                                 ) : (
-                                    <Tooltip title="Reactivar Paciente">
-                                        <IconButton size="small" color="success" onClick={() => handleTogglePatientStatusRequest(row.original)}>
-                                            <UnarchiveIcon />
-                                        </IconButton>
-                                    </Tooltip>
+                                    <Tooltip title="Reactivar Paciente"><IconButton size="small" color="success" onClick={() => handleTogglePatientStatusRequest(row.original)}><UnarchiveIcon /></IconButton></Tooltip>
                                 )}
                             </Box>
                         )}
-                        enableGlobalFilter
-                        initialState={{ showGlobalFilter: true }}
+                        enableGlobalFilter initialState={{ showGlobalFilter: true }}
                         muiSearchTextFieldProps={{
                             placeholder: 'Buscar pacientes...',
                             sx: { m: '0.5rem 0', width: '100%' },
-                            variant: 'outlined',
-                            size: 'small',
+                            variant: 'outlined', size: 'small',
                         }}
                         positionGlobalFilter="left"
                     />
@@ -450,14 +453,7 @@ const PatientsView = () => {
                                             <TableCell><Chip label={record.pathology || 'N/A'} size="small" color={record.pathology ? 'info' : 'default'} /></TableCell>
                                             <TableCell>
                                                 {record.attachmentPath && (
-                                                     <IconButton 
-                                                        size="small" 
-                                                        href={`${API_BASE_URL}/storage/${record.attachmentPath.split(/[\\/]/).pop()}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                     >
-                                                        <DownloadIcon fontSize="inherit" />
-                                                    </IconButton>
+                                                     <IconButton size="small" href={`${API_BASE_URL}/storage/${record.attachmentPath.split(/[\\/]/).pop()}`} target="_blank" rel="noopener noreferrer"><DownloadIcon fontSize="inherit" /></IconButton>
                                                 )}
                                             </TableCell>
                                             <TableCell align="center">
@@ -477,9 +473,7 @@ const PatientsView = () => {
             <Dialog open={openAddPatientModal} onClose={handleCloseAddPatientModal} maxWidth="xs" fullWidth>
                 <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Añadir Nuevo Paciente</DialogTitle>
                 <DialogContent sx={{ pt: 1 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-                        <Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>{getInitials(`${newPatientData.firstName} ${newPatientData.lastName}`)}</Avatar>
-                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}><Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>{getInitials(`${newPatientData.firstName} ${newPatientData.lastName}`)}</Avatar></Box>
                     <Grid container spacing={2} direction="column">
                         <Grid item xs={12}><TextField autoFocus name="dni" label="DNI *" value={newPatientData.dni} onChange={handleNewPatientChange} fullWidth error={!!newPatientErrors.dni} helperText={newPatientErrors.dni} /></Grid>
                         <Grid item xs={12}><TextField name="lastName" label="Apellido *" value={newPatientData.lastName} onChange={handleNewPatientChange} fullWidth error={!!newPatientErrors.lastName} helperText={newPatientErrors.lastName} /></Grid>
@@ -493,24 +487,35 @@ const PatientsView = () => {
                 <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}><Button onClick={handleCloseAddPatientModal} color="inherit">Cancelar</Button><Button onClick={handleSaveNewPatient} variant="contained">Guardar Paciente</Button></DialogActions>
             </Dialog>
 
+            {/* --- INICIO DEL MODAL CORREGIDO Y REINSERTADO --- */}
             {editingPatientData && (
                 <Dialog open={openEditPatientModal} onClose={handleCloseEditPatientModal} maxWidth="xs" fullWidth>
                     <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Editar Datos del Paciente</DialogTitle>
                     <DialogContent sx={{ pt: 1 }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}><Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>{getInitials(`${editingPatientData.firstName} ${editingPatientData.lastName}`)}</Avatar></Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+                            <Avatar sx={{ width: 80, height: 80, mb: 1, fontSize: '2rem', bgcolor: 'primary.light' }}>
+                                {getInitials(`${editingPatientData.firstName} ${editingPatientData.lastName}`)}
+                            </Avatar>
+                        </Box>
                         <Grid container spacing={2} direction="column">
                             <Grid item xs={12}><TextField name="dni" label="DNI *" value={editingPatientData.dni} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.dni} helperText={editingPatientErrors.dni}/></Grid>
                             <Grid item xs={12}><TextField autoFocus name="lastName" label="Apellido *" value={editingPatientData.lastName} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.lastName} helperText={editingPatientErrors.lastName}/></Grid>
                             <Grid item xs={12}><TextField name="firstName" label="Nombre *" value={editingPatientData.firstName} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.firstName} helperText={editingPatientErrors.firstName}/></Grid>
                             <Grid item xs={12}><TextField name="email" label="Correo Electrónico *" type="email" value={editingPatientData.email} onChange={handleEditingPatientChange} fullWidth error={!!editingPatientErrors.email} helperText={editingPatientErrors.email}/></Grid>
                             <Grid item xs={12}><TextField name="phone" label="Teléfono" value={editingPatientData.phone} onChange={handleEditingPatientChange} fullWidth/></Grid>
-                            <Grid item xs={12}><DatePicker label="Fecha de Nacimiento" value={editingPatientData.birthDate} onChange={handleEditingPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/></Grid>
+                            <Grid item xs={12}>
+                                <DatePicker label="Fecha de Nacimiento" value={editingPatientData.birthDate} onChange={handleEditingPatientDateChange} renderInput={(params) => <TextField {...params} fullWidth />} maxDate={new Date()} format="dd/MM/yyyy"/>
+                            </Grid>
                         </Grid>
                         {editingPatientErrors.form && <Alert severity="error" sx={{mt:2}}>{editingPatientErrors.form}</Alert>}
                     </DialogContent>
-                    <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}><Button onClick={handleCloseEditPatientModal} color="inherit">Cancelar</Button><Button onClick={handleSaveEditedPatient} variant="contained">Guardar Cambios</Button></DialogActions>
+                    <DialogActions sx={{p: '16px 24px', justifyContent: 'space-between'}}>
+                        <Button onClick={handleCloseEditPatientModal} color="inherit">Cancelar</Button>
+                        <Button onClick={handleSaveEditedPatient} variant="contained">Guardar Cambios</Button>
+                    </DialogActions>
                 </Dialog>
             )}
+            {/* --- FIN DEL MODAL CORREGIDO --- */}
 
             <Dialog open={openTogglePatientStatusConfirmModal} onClose={handleCloseTogglePatientStatusConfirmModal}>
                 <DialogTitle>Confirmar Cambio de Estado</DialogTitle>

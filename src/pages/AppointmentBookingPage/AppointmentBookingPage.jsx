@@ -9,7 +9,6 @@ import { API_BASE_URL } from '../../config';
 import AvailabilityCalendar from '../../components/AvailabilityCalendar/AvailabilityCalendar.jsx';
 import PatientForm from '../../components/PatientForm/PatientForm.jsx';
 import AppointmentConfirmation from '../../components/AppointmentConfirmation/AppointmentConfirmation.jsx';
-import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
 import SearchIcon from '@mui/icons-material/Search';
 
 const getInitials = (name) => {
@@ -25,12 +24,25 @@ const getInitials = (name) => {
 };
 
 const STEPS = {
-    WELCOME_DNI: 0,
-    PROFESSIONAL_SELECTION: 1,
-    CALENDAR_SELECTION: 2,
-    PATIENT_FORM: 3,
-    CONFIRMATION: 4,
+    PROFESSIONAL_SELECTION: 'PROFESSIONAL_SELECTION',
+    CALENDAR_SELECTION: 'CALENDAR_SELECTION',
+    PATIENT_FORM: 'PATIENT_FORM',
+    CONFIRMATION: 'CONFIRMATION',
 };
+
+const AnimatedStep = ({ children }) => (
+    <Box
+        sx={{
+            animation: 'fadeInSlideUp 0.5s ease-out forwards',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+        }}
+    >
+        {children}
+    </Box>
+);
 
 const AppointmentBookingPage = () => {
     const { professionalId: paramProfessionalId } = useParams();
@@ -107,7 +119,7 @@ const AppointmentBookingPage = () => {
             const response = await fetch(`${API_BASE_URL}/api/public/patients/lookup?dni=${dniInput.trim()}`);
             if (response.status === 404) {
                 setRecognizedPatient({ dni: dniInput.trim() });
-                throw new Error("DNI no encontrado. Por favor, complete sus datos al solicitar el turno.");
+                throw new Error("DNI no encontrado. Puede continuar y completar sus datos.");
             }
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -126,9 +138,13 @@ const AppointmentBookingPage = () => {
     };
 
     const handleCloseWelcomeModal = () => {
-        setWelcomeModalOpen(false);
-        if (!paramProfessionalId) {
-            setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
+        if (dniLookupPerformed || !dniInput.trim()) {
+            setWelcomeModalOpen(false);
+            if (!paramProfessionalId) {
+                setCurrentStep(STEPS.PROFESSIONAL_SELECTION);
+            }
+        } else {
+            setLookupError("Por favor, presione 'Buscar' para validar su DNI antes de continuar.");
         }
     };
 
@@ -230,14 +246,15 @@ const AppointmentBookingPage = () => {
                     Elija al profesional con quien desea agendar su turno.
                 </Typography>
                 <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+                    display: 'flex',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
                     gap: 3
                 }}>
                     {professionals.map((prof) => (
-                        <Card key={prof.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
-                            <Avatar sx={{ width: 80, height: 80, mb: 2, fontSize: '2.5rem', bgcolor: 'secondary.main' }}>
-                                {getInitials(prof.fullName)}
+                        <Card key={prof.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2, width: {xs: '100%', sm: '300px'} }}>
+                            <Avatar src={`${API_BASE_URL}${prof.profileImageUrl}`} sx={{ width: 80, height: 80, mb: 2, fontSize: '2.5rem', bgcolor: 'secondary.main' }}>
+                                {!prof.profileImageUrl && getInitials(prof.fullName)}
                             </Avatar>
                             <CardContent sx={{ textAlign: 'center', flexGrow: 1, pt: 0 }}>
                                 <Typography gutterBottom variant="h6" component="div">
@@ -264,17 +281,28 @@ const AppointmentBookingPage = () => {
     };
 
     return (
-        <>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'grey.100' }}>
             <CssBaseline />
             <AppBar position="static" color="primary">
                 <Toolbar>
-                    <MedicalInformationIcon sx={{ mr: 2 }} />
+                    <Box component="img" src="/logo-unsta-white.png" sx={{ height: '36px', mr: 2 }} />
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                         Gestión de Pacientes y Turnos UNSTA - Solicitud de turnos
                     </Typography>
                 </Toolbar>
             </AppBar>
-            <Dialog open={welcomeModalOpen && !paramProfessionalId} onClose={handleCloseWelcomeModal} disableEscapeKeyDown aria-labelledby="welcome-dialog-title" maxWidth="sm" fullWidth>
+            <Dialog 
+                open={welcomeModalOpen && !paramProfessionalId} 
+                onClose={(event, reason) => {
+                    if (reason !== 'backdropClick' && reason !== 'escapeKeyDown') {
+                        handleCloseWelcomeModal();
+                    }
+                }}
+                disableEscapeKeyDown
+                aria-labelledby="welcome-dialog-title" 
+                maxWidth="sm" 
+                fullWidth
+            >
                 <DialogTitle id="welcome-dialog-title" sx={{ textAlign: 'center', pt: 3 }}>Bienvenido a NutriSmart</DialogTitle>
                 <DialogContent>
                     <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -290,10 +318,7 @@ const AppointmentBookingPage = () => {
                                 sx={{ flexGrow: 1 }}
                                 onKeyPress={(e) => e.key === 'Enter' && handleDniLookup()}
                             />
-                            <Button
-                                variant="contained" onClick={handleDniLookup} disabled={lookupLoading}
-                                startIcon={lookupLoading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
-                            >
+                            <Button variant="contained" onClick={handleDniLookup} disabled={lookupLoading || !dniInput.trim()} startIcon={lookupLoading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}>
                                 Buscar
                             </Button>
                         </Box>
@@ -308,8 +333,7 @@ const AppointmentBookingPage = () => {
                         <Typography variant="h6" component="div" gutterBottom>ATENCIÓN:</Typography>
                         <Typography variant="body2">El turno solicitado es un compromiso.</Typography>
                         <Typography variant="body2" sx={{ mt: 1 }}>
-                            Si no asistirá al turno solicitado, rogamos comuncarse y cancelar el mismo para liberar el horario y
-                            pueda ser usado por otro paciente. Agradecemos su compromiso y comprensión.
+                            Si no asistirá al turno solicitado, rogamos comuncarse y cancelar el mismo para liberar el horario y pueda ser usado por otro paciente. Agradecemos su compromiso y comprensión.
                         </Typography>
                     </Alert>
                 </DialogContent>
@@ -318,18 +342,25 @@ const AppointmentBookingPage = () => {
                         onClick={handleCloseWelcomeModal}
                         variant="contained"
                         fullWidth
-                        disabled={lookupLoading}
+                        disabled={lookupLoading || !dniLookupPerformed}
                     >
                         Acepto, Continuar
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    {currentStep === STEPS.PROFESSIONAL_SELECTION && renderProfessionalSelection()}
-
-                    {currentStep === STEPS.CALENDAR_SELECTION && (
+            <Container 
+                component="main" 
+                maxWidth="lg" 
+                sx={{ 
+                    flexGrow: 1, display: 'flex', flexDirection: 'column', 
+                    alignItems: 'center', justifyContent: 'flex-start',
+                    pt: 4, pb: 4
+                }}
+            >
+                {currentStep === STEPS.PROFESSIONAL_SELECTION && <AnimatedStep key="step1">{renderProfessionalSelection()}</AnimatedStep>}
+                {currentStep === STEPS.CALENDAR_SELECTION && (
+                    <AnimatedStep key="step2">
                         <Box sx={{ width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <Typography variant="h4" component="h1" gutterBottom>
                                 Agendar turno con {selectedProfessionalName || 'el profesional'}
@@ -337,49 +368,47 @@ const AppointmentBookingPage = () => {
                             <Typography variant="body1" color="text.secondary" sx={{ mb: 3, textAlign: 'center', maxWidth: '700px' }}>
                                 Haga clic sobre un horario disponible para comenzar su reserva.
                             </Typography>
-                            
                             {selectedProfessionalId ? (
                                 <Box sx={{ width: '100%' }}>
-                                     <AvailabilityCalendar
-                                        onSlotSelect={handleSlotSelected}
-                                        professionalId={selectedProfessionalId}
-                                    />
+                                     <AvailabilityCalendar onSlotSelect={handleSlotSelected} professionalId={selectedProfessionalId} />
                                 </Box>
-                            ) : (
-                                <CircularProgress />
-                            )}
-                            
+                            ) : <CircularProgress />}
                             <Box sx={{ mt: 3 }}>
                                 {!paramProfessionalId && (
-                                    <Button variant="outlined" onClick={handleCancelForm}>
-                                        Volver a Selección de Profesional
-                                    </Button>
+                                    <Button variant="outlined" onClick={handleCancelForm}>Volver a Selección de Profesional</Button>
                                 )}
                             </Box>
                         </Box>
-                    )}
-
-                    {currentStep === STEPS.PATIENT_FORM && (
+                    </AnimatedStep>
+                )}
+                {currentStep === STEPS.PATIENT_FORM && (
+                    <AnimatedStep key="step3">
                         <Box sx={{ width: '100%', maxWidth: '700px' }}>
                             <PatientForm
-                                selectedDateTime={selectedDateTime}
-                                onSubmit={handleFormSubmit}
-                                onCancel={handleCancelForm}
-                                prefilledData={recognizedPatient}
-                                submissionError={submissionError}
-                                isSubmitting={isSubmitting}
+                                selectedDateTime={selectedDateTime} onSubmit={handleFormSubmit} onCancel={handleCancelForm}
+                                prefilledData={recognizedPatient} submissionError={submissionError} isSubmitting={isSubmitting}
                             />
                         </Box>
-                    )}
-
-                    {currentStep === STEPS.CONFIRMATION && (
+                    </AnimatedStep>
+                )}
+                {currentStep === STEPS.CONFIRMATION && (
+                    <AnimatedStep key="step4">
                          <Box sx={{ width: '100%', maxWidth: '700px' }}>
                             <AppointmentConfirmation appointmentDetails={confirmedAppointment} onBookAnother={handleBookAnother} />
                         </Box>
-                    )}
-                </Box>
+                    </AnimatedStep>
+                )}
             </Container>
-        </>
+            
+            <style>
+                {`
+                    @keyframes fadeInSlideUp {
+                        from { opacity: 0; transform: translateY(15px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                `}
+            </style>
+        </Box>
     );
 };
 

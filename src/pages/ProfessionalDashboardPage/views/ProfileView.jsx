@@ -163,7 +163,6 @@ const ProfileView = () => {
 
         } catch (err) {
             showNotification(err.message || 'Error al actualizar el perfil', 'error');
-            // Si falla, volvemos a cargar los datos originales para evitar inconsistencias
             fetchProfile();
         } finally {
             setLoading(false);

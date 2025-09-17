@@ -1,3 +1,5 @@
+// En: server/controllers/patientController.js
+
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
 
@@ -6,33 +8,51 @@ export const getPatients = async (req, res) => {
     try {
         let query;
         let params;
-        const lastAppointmentSubquery = `
-            LEFT JOIN (
-                SELECT patientId, MAX(dateTime) as lastAppointment
-                FROM Appointments
-                WHERE status = 'COMPLETED'
-                GROUP BY patientId
-            ) AS la ON p.id = la.patientId
-        `;
+        
         if (role === 'ADMIN') {
+            // --- SUBCONSULTA CORREGIDA PARA EL ADMIN ---
+            const lastAppointmentSubquery = `
+                LEFT JOIN (
+                    SELECT 
+                        patientId, 
+                        MAX(dateTime) as lastAppointment,
+                        -- Usamos SUBSTRING_INDEX con GROUP_CONCAT para obtener el ID del profesional
+                        -- asociado a la CITA MÁS RECIENTE (ordenada por fecha descendente).
+                        SUBSTRING_INDEX(GROUP_CONCAT(professionalUserId ORDER BY dateTime DESC), ',', 1) as lastProfessionalId
+                    FROM Appointments
+                    WHERE status = 'COMPLETED'
+                    GROUP BY patientId
+                ) AS la ON p.id = la.patientId
+            `;
+            // --- CONSULTA PRINCIPAL CORREGIDA PARA EL ADMIN ---
             query = `
                 SELECT 
                     p.id, p.dni, p.fullName, p.firstName, p.lastName, p.email, p.phone, p.birthDate, p.isActive, 
-                    u.fullName AS createdByProfessionalName,
+                    COALESCE(creator.fullName, lastProf.fullName, 'Sistema/Público') AS createdByProfessionalName,
                     la.lastAppointment
                 FROM Patients p
-                LEFT JOIN Users u ON p.createdByProfessionalId = u.id
+                LEFT JOIN Users creator ON p.createdByProfessionalId = creator.id
                 ${lastAppointmentSubquery}
+                LEFT JOIN Users lastProf ON la.lastProfessionalId = lastProf.id
                 ORDER BY p.lastName ASC, p.firstName ASC
             `;
             params = [];
         } else {
+            // La consulta para el profesional no necesita esta lógica compleja, así que la mantenemos simple.
+            const professionalLastAppointmentSubquery = `
+                LEFT JOIN (
+                    SELECT patientId, MAX(dateTime) as lastAppointment
+                    FROM Appointments
+                    WHERE status = 'COMPLETED'
+                    GROUP BY patientId
+                ) AS la ON p.id = la.patientId
+            `;
             query = `
                 SELECT 
                     p.id, p.dni, p.fullName, p.firstName, p.lastName, p.email, p.phone, p.birthDate, p.isActive,
                     la.lastAppointment
                 FROM Patients p
-                ${lastAppointmentSubquery}
+                ${professionalLastAppointmentSubquery}
                 WHERE p.id IN (
                     SELECT id FROM Patients WHERE createdByProfessionalId = ?
                     UNION

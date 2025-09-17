@@ -71,7 +71,6 @@ const UserManagementView = () => {
     const handleOpenEditModal = async (user) => {
         setIsEditing(true);
         try {
-            // Ya no necesitamos obtener la especialidad de una ruta separada
             setCurrentUser({ ...user, password: '', confirmPassword: '' });
         } catch (err) {
             showNotification(err.message, 'error');
@@ -140,7 +139,6 @@ const UserManagementView = () => {
     const handleConfirmToggleUserStatus = async () => {
         if (!userToToggle) return;
         try {
-            // Usamos PATCH para el cambio de estado, es más correcto semánticamente
             await authFetch(`/api/admin/users/${userToToggle.id}`, { method: 'PATCH' });
             const action = userToToggle.isActive ? 'desactivado' : 'reactivado';
             showNotification(`Usuario ${action} exitosamente.`, 'success');
