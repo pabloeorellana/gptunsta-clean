@@ -228,7 +228,7 @@ const AvailabilityView = () => {
                 method: 'POST',
                 body: JSON.stringify(newSchedulePayload),
             });
-            fetchAvailabilityData(); // Recargar todos los datos para mantener la consistencia
+            fetchAvailabilityData();
         } catch (error) {
             console.error("Error añadiendo horario regular:", error);
             setError(error.message || "Error al guardar horario.");

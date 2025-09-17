@@ -69,7 +69,6 @@ export const forgotPassword = async (req, res) => {
             [hashedToken, expirationDate, user.id]
         );
 
-        // Enviar el email con el token SIN hashear
         await sendPasswordResetEmail(user.email, resetToken);
 
         res.json({ message: 'Si existe una cuenta con ese correo, se ha enviado un enlace de restablecimiento.' });

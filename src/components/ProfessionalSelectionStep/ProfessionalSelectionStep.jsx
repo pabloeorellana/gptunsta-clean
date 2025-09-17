@@ -82,20 +82,13 @@ const ProfessionalSelectionStep = ({ onSelectProfessional, preSelectedProfession
                     <Grid item key={prof.id} xs={12} sm={6} md={4}>
                         <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                             <CardContent sx={{ flexGrow: 1, textAlign: 'center' }}>
-                                {/* --- INICIO DE LA CORRECCIÓN FINAL --- */}
                                 <Avatar 
-                                    // La lógica es: si prof.profileImageUrl existe (no es null ni undefined),
-                                    // construye la URL completa. De lo contrario, no pases ningún 'src'.
                                     src={prof.profileImageUrl ? `${API_BASE_URL}${prof.profileImageUrl}` : undefined} 
                                     alt={prof.fullName} 
                                     sx={{ width: 80, height: 80, margin: 'auto', mb: 2, fontSize: '2.5rem', bgcolor: 'secondary.main' }}
                                 >
-                                    {/* El componente Avatar de MUI es inteligente: si 'src' está vacío o falla,
-                                        automáticamente mostrará a sus "hijos" (children).
-                                        Por eso, ponemos las iniciales aquí como fallback. */}
                                     {!prof.profileImageUrl && getInitials(prof.fullName)}
                                 </Avatar>
-                                {/* --- FIN DE LA CORRECCIÓN FINAL --- */}
                                 <Typography gutterBottom variant="h5" component="h2">{prof.fullName}</Typography>
                                 <Typography color="primary" sx={{mb:1}}>{prof.specialty}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{prof.description || 'Sin descripción.'}</Typography>

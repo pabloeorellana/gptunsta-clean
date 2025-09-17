@@ -11,13 +11,12 @@ import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import PeopleIcon from '@mui/icons-material/People';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import LockResetIcon from '@mui/icons-material/LockReset';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useAuth } from '../../context/AuthContext';
 import authFetch from '../../utils/authFetch';
-import { DateTime } from 'luxon'; 
+import { DateTime } from 'luxon';
 
 import AppointmentsView from './views/AppointmentsView.jsx';
 import AvailabilityView from './views/AvailabilityView.jsx';
@@ -154,9 +153,12 @@ const ProfessionalDashboardLayout = (props) => {
                     <IconButton color="inherit" aria-label="open drawer" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { sm: 'none' } }}>
                         <MenuIcon />
                     </IconButton>
-                    <Typography variant="h6" noWrap component={RouterLink} to="/profesional/dashboard/agenda" sx={{ display: { xs: 'none', sm: 'flex' }, fontWeight: 700, color: 'inherit', textDecoration: 'none', alignItems: 'center' }}>
-                        Gestión de Pacientes y Turnos UNSTA
-                    </Typography>
+                    <Box component={RouterLink} to="/profesional/dashboard/agenda" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
+                        <Box component="img" src="/logo-unsta-white.png" sx={{ height: '36px', mr: 1.5 }} />
+                        <Typography variant="h6" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>
+                            Gestión de Pacientes y Turnos UNSTA
+                        </Typography>
+                    </Box>
                     <Box sx={{ flexGrow: 1 }} />
                     <Stack direction="row" spacing={1.5} alignItems="center">
                         <Tooltip title="Notificaciones">

@@ -182,20 +182,15 @@ export const getAvailability = async (req, res) => {
         const nowUTC = DateTime.utc();
 
         for (const schedule of schedules) {
-            // 1. Creamos objetos de fecha/hora LOCALES usando Luxon
-            // Esto interpreta "09:00:00" como hora de Argentina para el día `date`.
             let currentSlot = DateTime.fromISO(`${date}T${schedule.startTime}`, { zone: timeZone });
             const scheduleEnd = DateTime.fromISO(`${date}T${schedule.endTime}`, { zone: timeZone });
 
-            // 2. El bucle ahora funciona con objetos Luxon
             while (currentSlot < scheduleEnd) {
-                // Comparamos en UTC para consistencia
                 if (currentSlot.toUTC() < nowUTC) {
                     currentSlot = currentSlot.plus({ minutes: schedule.slotDurationMinutes });
                     continue;
                 }
 
-                // La comparación es ahora precisa usando milisegundos
                 const isBooked = bookedAppointments.some(appt => 
                     DateTime.fromISO(appt.dateTime).toMillis() === currentSlot.toMillis()
                 );
@@ -206,11 +201,9 @@ export const getAvailability = async (req, res) => {
                 );
 
                 if (!isBooked && !isBlocked) {
-                    // Formateamos el slot para mostrarlo en el frontend
                     allAvailableSlots.push(currentSlot.toFormat('HH:mm'));
                 }
-                
-                // Luxon es inmutable, así que creamos un nuevo objeto para el siguiente slot
+             
                 currentSlot = currentSlot.plus({ minutes: schedule.slotDurationMinutes });
             }
         }
