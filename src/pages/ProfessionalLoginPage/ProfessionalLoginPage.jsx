@@ -111,7 +111,7 @@ const ProfessionalLoginPage = () => {
 
                 <Box component="form" onSubmit={handleSubmit} noValidate sx={{ width: '100%' }}>
                     <TextField
-                        margin="normal" required fullWidth id="dni" label="DNI" name="dni"
+                        margin="normal" required fullWidth id="dni" label="Usuario" name="dni"
                         autoComplete="username" autoFocus value={credentials.dni} onChange={handleChange}
                         disabled={loading}
                     />

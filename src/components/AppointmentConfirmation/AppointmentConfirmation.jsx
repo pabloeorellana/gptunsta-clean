@@ -1,5 +1,3 @@
-// En: src/components/AppointmentConfirmation/AppointmentConfirmation.jsx
-
 import React from 'react';
 import { Typography, Paper, Button, Box, Alert, Stack, Divider } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -13,7 +11,6 @@ const AppointmentConfirmation = ({ appointmentDetails, onBookAnother }) => {
     const { patient, dateTime, professionalName } = appointmentDetails;
     const patientName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim();
     
-    // Formateamos la fecha y hora para una mejor visualización
     const formattedDate = dateTime.toLocaleDateString('es-ES', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
     });
