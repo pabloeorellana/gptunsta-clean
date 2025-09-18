@@ -248,7 +248,7 @@ const ProfileView = () => {
                                 </Avatar>
                             </Badge>
                         </Grid>
-                        <Grid item xs={12}><TextField label="DNI" value={profileData.dni} fullWidth InputProps={{ readOnly: true }} variant="filled" helperText="El DNI no puede ser modificado."/></Grid>
+                        <Grid item xs={12}><TextField label="Usuario" value={profileData.dni} fullWidth InputProps={{ readOnly: true }} variant="filled" helperText="El usuario no puede ser modificado."/></Grid>
                         <Grid item xs={12}><TextField required fullWidth name="fullName" label="Nombre Completo" value={profileData.fullName} onChange={handleChange} disabled={!isEditing || loading} variant={isEditing ? "outlined" : "filled"} InputProps={{ readOnly: !isEditing }}/></Grid>
                         <Grid item xs={12}><TextField required fullWidth name="email" label="Correo Electrónico" type="email" value={profileData.email} onChange={handleChange} disabled={!isEditing || loading} variant={isEditing ? "outlined" : "filled"} InputProps={{ readOnly: !isEditing }}/></Grid>
                         <Grid item xs={12}><TextField fullWidth name="phone" label="Teléfono" value={profileData.phone} onChange={handleChange} disabled={!isEditing || loading} variant={isEditing ? "outlined" : "filled"} InputProps={{ readOnly: !isEditing }}/></Grid>

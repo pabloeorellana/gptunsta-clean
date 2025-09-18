@@ -303,7 +303,7 @@ const AppointmentBookingPage = () => {
                 maxWidth="sm" 
                 fullWidth
             >
-                <DialogTitle id="welcome-dialog-title" sx={{ textAlign: 'center', pt: 3 }}>Bienvenido a NutriSmart</DialogTitle>
+                <DialogTitle id="welcome-dialog-title" sx={{ textAlign: 'center', pt: 3 }}>Bienvenido/a</DialogTitle>
                 <DialogContent>
                     <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                         <Typography variant="h6" gutterBottom>¿Ya eres paciente?</Typography>

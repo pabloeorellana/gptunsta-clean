@@ -17,6 +17,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useAuth } from '../../context/AuthContext';
 import authFetch from '../../utils/authFetch';
 import { DateTime } from 'luxon';
+import { API_BASE_URL } from '../../config';
 
 import AppointmentsView from './views/AppointmentsView.jsx';
 import AvailabilityView from './views/AvailabilityView.jsx';
@@ -107,7 +108,9 @@ const ProfessionalDashboardLayout = (props) => {
     };
 
     const professionalName = authUser?.user?.fullName || "Profesional";
-    const professionalAvatarUrl = authUser?.user?.profileImageUrl;
+    const professionalAvatarUrl = authUser?.user?.profileImageUrl 
+        ? `${API_BASE_URL}${authUser.user.profileImageUrl}` 
+        : undefined;
 
     const drawer = (
         <div>
@@ -175,7 +178,7 @@ const ProfessionalDashboardLayout = (props) => {
                                 startIcon={
                                     <Avatar
                                         alt={professionalName}
-                                        src={professionalAvatarUrl || undefined}
+                                        src={professionalAvatarUrl}
                                         sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}
                                     >
                                         {!professionalAvatarUrl && getInitials(professionalName)}
